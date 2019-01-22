@@ -1,0 +1,182 @@
+/*
+ * See LICENSE for licensing information
+ */
+
+#include "oniontrace.h"
+
+struct _OnionTraceConfig {
+    /* See the README file for explanation of these arguments */
+    OnionTraceMode mode;
+
+    in_port_t torControlPort;
+    GLogLevelFlags logLevel;
+    GString* filename;
+};
+
+static gboolean _oniontraceconfig_parseMode(OnionTraceConfig* config, gchar* value) {
+    g_assert(config && value);
+
+    if(!g_ascii_strcasecmp(value, "record")) {
+        config->mode = ONIONTRACE_MODE_RECORD;
+    } else if(!g_ascii_strcasecmp(value, "play")) {
+        config->mode = ONIONTRACE_MODE_PLAY;
+    } else {
+        warning("invalid mode '%s' provided, see README for valid values", value);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean _oniontraceconfig_parseTorControlPort(OnionTraceConfig* config, gchar* value) {
+    g_assert(config && value);
+
+    gint port = atoi(value);
+
+    if(port < 1 || port > G_MAXUINT16) {
+        return FALSE;
+    }
+
+    config->torControlPort = (in_port_t)htons((in_port_t)port);
+
+    return TRUE;
+}
+
+static gboolean _oniontraceconfig_parseLogLevel(OnionTraceConfig* config, gchar* value) {
+    g_assert(config && value);
+
+    if(!g_ascii_strcasecmp(value, "debug")) {
+        config->logLevel = G_LOG_LEVEL_DEBUG;
+    } else if(!g_ascii_strcasecmp(value, "info")) {
+        config->logLevel = G_LOG_LEVEL_INFO;
+    } else if(!g_ascii_strcasecmp(value, "message")) {
+        config->logLevel = G_LOG_LEVEL_MESSAGE;
+    } else if(!g_ascii_strcasecmp(value, "warning")) {
+        config->logLevel = G_LOG_LEVEL_WARNING;
+    } else {
+        warning("invalid log level '%s' provided, see README for valid values", value);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean _oniontraceconfig_parseTraceFile(OnionTraceConfig* config, gchar* value) {
+    g_assert(config && value);
+
+    if(0) {
+
+    } else {
+        warning("invalid filename '%s' provided, see README for valid values", value);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+OnionTraceConfig* oniontraceconfig_new(gint argc, gchar* argv[]) {
+    gboolean hasError = FALSE;
+
+    OnionTraceConfig* config = g_new0(OnionTraceConfig, 1);
+
+    /* set defaults, which will get overwritten if set in args */
+    config->mode = ONIONTRACE_MODE_RECORD;
+    config->logLevel = G_LOG_LEVEL_INFO;
+    config->filename = g_string_new("oniontrace.csv");
+
+    /* parse all of the key=value pairs, skip the first program name arg */
+    for(gint i = 1; i < argc; i++) {
+        gchar* entry = argv[i];
+
+        gchar** parts = g_strsplit(entry, "=", 2);
+        gchar* key = parts[0];
+        gchar* value = parts[1];
+
+        if(key != NULL && value != NULL) {
+            /* we have both key and value in key=value entry */
+            if(!g_ascii_strcasecmp(key, "Mode")) {
+                if(!_oniontraceconfig_parseMode(config, value)) {
+                    hasError = TRUE;
+                }
+            } else if(!g_ascii_strcasecmp(key, "TorControlPort")) {
+                if(!_oniontraceconfig_parseTorControlPort(config, value)) {
+                    hasError = TRUE;
+                }
+            } else if(!g_ascii_strcasecmp(key, "LogLevel")) {
+                if(!_oniontraceconfig_parseLogLevel(config, value)) {
+                    hasError = TRUE;
+                }
+            } else if(!g_ascii_strcasecmp(key, "TraceFile")) {
+                if(!_oniontraceconfig_parseTraceFile(config, value)) {
+                    hasError = TRUE;
+                }
+            } else {
+                warning("unrecognized key '%s' in config", key);
+                hasError = TRUE;
+            }
+
+            if(hasError) {
+                critical("error in config: key='%s' value='%s'", key, value);
+            } else {
+                message("successfully parsed key='%s' value='%s'", key, value);
+            }
+        } else {
+            /* we are missing either the key or the value */
+            hasError = TRUE;
+
+            if(key != NULL) {
+                critical("can't find key '%s' in config entry", key);
+            } else {
+                critical("can't find value in config entry; key='%s'", key);
+            }
+        }
+
+        g_strfreev(parts);
+
+        if(hasError) {
+            oniontraceconfig_free(config);
+            return NULL;
+        }
+    }
+
+    /* now make sure we have the required arguments (FileServer mode has no required args) */
+    if(config->mode == ONIONTRACE_MODE_RECORD) {
+        if(config->torControlPort == 0) {
+            critical("missing required valid Tor control port argument `TorControlPort`");
+            oniontraceconfig_free(config);
+            return NULL;
+        }
+    }
+
+    return config;
+}
+
+void oniontraceconfig_free(OnionTraceConfig* config) {
+    g_assert(config);
+
+    if(config->filename) {
+        g_string_free(config->filename, TRUE);
+    }
+
+    g_free(config);
+}
+
+in_port_t oniontraceconfig_getTorControlPort(OnionTraceConfig* config) {
+    g_assert(config);
+    return config->torControlPort;
+}
+
+GLogLevelFlags oniontraceconfig_getLogLevel(OnionTraceConfig* config) {
+    g_assert(config);
+    return config->logLevel;
+}
+
+OnionTraceMode oniontraceconfig_getMode(OnionTraceConfig* config) {
+    g_assert(config);
+    return config->mode;
+}
+
+const gchar* oniontraceconfig_getTraceFileName(OnionTraceConfig* config) {
+    g_assert(config);
+    return config->filename ? config->filename->str : NULL;
+}
