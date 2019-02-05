@@ -10,8 +10,20 @@ struct _OnionTraceConfig {
 
     in_port_t torControlPort;
     GLogLevelFlags logLevel;
-    GString* filename;
+    gchar* filename;
 };
+
+static gchar* _oniontrace_getHomePath(const gchar* path) {
+    g_assert(path);
+    GString* sbuffer = g_string_new(path);
+    if(g_ascii_strncasecmp(path, "~", 1) == 0) {
+        /* replace ~ with home directory */
+        const gchar* home = g_get_home_dir();
+        g_string_erase(sbuffer, 0, 1);
+        g_string_prepend(sbuffer, home);
+    }
+    return g_string_free(sbuffer, FALSE);
+}
 
 static gboolean _oniontraceconfig_parseMode(OnionTraceConfig* config, gchar* value) {
     g_assert(config && value);
@@ -64,8 +76,11 @@ static gboolean _oniontraceconfig_parseLogLevel(OnionTraceConfig* config, gchar*
 static gboolean _oniontraceconfig_parseTraceFile(OnionTraceConfig* config, gchar* value) {
     g_assert(config && value);
 
-    if(0) {
-
+    if(value) {
+        if(config->filename) {
+            g_free(config->filename);
+        }
+        config->filename = _oniontrace_getHomePath(value);
     } else {
         warning("invalid filename '%s' provided, see README for valid values", value);
         return FALSE;
@@ -82,7 +97,7 @@ OnionTraceConfig* oniontraceconfig_new(gint argc, gchar* argv[]) {
     /* set defaults, which will get overwritten if set in args */
     config->mode = ONIONTRACE_MODE_RECORD;
     config->logLevel = G_LOG_LEVEL_INFO;
-    config->filename = g_string_new("oniontrace.csv");
+    config->filename = g_strdup("oniontrace.csv");
 
     /* parse all of the key=value pairs, skip the first program name arg */
     for(gint i = 1; i < argc; i++) {
@@ -139,10 +154,20 @@ OnionTraceConfig* oniontraceconfig_new(gint argc, gchar* argv[]) {
         }
     }
 
-    /* now make sure we have the required arguments (FileServer mode has no required args) */
-    if(config->mode == ONIONTRACE_MODE_RECORD) {
-        if(config->torControlPort == 0) {
-            critical("missing required valid Tor control port argument `TorControlPort`");
+    /* now make sure we have the required arguments */
+
+    /* we always need a tor control port */
+    if(config->torControlPort == 0) {
+        critical("missing required valid Tor control port argument `TorControlPort`");
+        oniontraceconfig_free(config);
+        return NULL;
+    }
+
+    /* if we are playing, then the trace file better exist */
+    if(config->mode == ONIONTRACE_MODE_PLAY) {
+        if(!config->filename ||
+                !g_file_test(config->filename, G_FILE_TEST_IS_REGULAR|G_FILE_TEST_EXISTS)) {
+            critical("path '%s' to trace file is not valid or does not exist", config->filename);
             oniontraceconfig_free(config);
             return NULL;
         }
@@ -155,7 +180,7 @@ void oniontraceconfig_free(OnionTraceConfig* config) {
     g_assert(config);
 
     if(config->filename) {
-        g_string_free(config->filename, TRUE);
+        g_free(config->filename);
     }
 
     g_free(config);
@@ -178,5 +203,5 @@ OnionTraceMode oniontraceconfig_getMode(OnionTraceConfig* config) {
 
 const gchar* oniontraceconfig_getTraceFileName(OnionTraceConfig* config) {
     g_assert(config);
-    return config->filename ? config->filename->str : NULL;
+    return config->filename ? config->filename : NULL;
 }

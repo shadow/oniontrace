@@ -6,7 +6,7 @@ This program records and plays back Tor circuit building and stream assignment.
 
 ```
 mkdir build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=/home/bin
+cmake .. -DCMAKE_INSTALL_PREFIX=/home/user/.local
 make
 make install # optional, installs to path set above
 ```
@@ -20,9 +20,9 @@ The valid keys and the type of the valid values are listed below, along with
 any defaults. The format is:  
  + `key`:ValueType (default=`val`) [Mode=`ValidMode`] - explanation
 
-Specifying the run mode is optional, the default mode is `record`:
+Specifying the run mode is **optional**, the default mode is `record`:
 
- + `Mode`:String (default=`trace`) [Mode=`record`,`play`]  
+ + `Mode`:String (default=`record`) [Mode=`record`,`play`]  
     Valid values for the running mode are `record` and `play`.  
     `record` mode records circuit creation and stream assignment schedules.  
     `play` mode creates circuits and assigns streams according to a  
