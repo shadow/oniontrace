@@ -187,10 +187,10 @@ static void _oniontracerecorder_onConnected(OnionTraceRecorder* recorder) {
 
     in_port_t clientPort = oniontracetorctl_getControlClientPort(recorder->torctl);
 
-    message("%s: successfully connected client port %u to Tor control server port %u",
+    message("%s: connection attempt finished on client port %u to Tor control server port %u",
             recorder->id, clientPort, oniontraceconfig_getTorControlPort(recorder->config));
 
-    message("%s: authenticating on client port %u", recorder->id, clientPort);
+    message("%s: attempting to authenticate on client port %u", recorder->id, clientPort);
 
     oniontracetorctl_commandAuthenticate(recorder->torctl,
             (OnAuthenticatedFunc)_oniontracerecorder_onAuthenticated, recorder);

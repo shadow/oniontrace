@@ -56,21 +56,21 @@ int main(int argc, char *argv[]) {
     gchar hostname[128];
     memset(hostname, 0, 128);
     gethostname(hostname, 128);
-	message("Starting oniontrace on host %s process id %i", hostname, (gint)getpid());
+    message("Starting oniontrace on host %s process id %i", hostname, (gint )getpid());
 
-	message("Parsing program arguments");
-	OnionTraceConfig* config = oniontraceconfig_new(argc, argv);
-	if(config == NULL) {
-	    message("Parsing config failed, exiting with failure");
-	    return EXIT_FAILURE;
-	}
+    message("Parsing program arguments");
+    OnionTraceConfig* config = oniontraceconfig_new(argc, argv);
+    if (config == NULL) {
+        message("Parsing config failed, exiting with failure");
+        return EXIT_FAILURE;
+    }
 
-	/* update to the configured log level */
-	globalLogFilterLevel = oniontraceconfig_getLogLevel(config);
+    /* update to the configured log level */
+    globalLogFilterLevel = oniontraceconfig_getLogLevel(config);
 
-	message("Creating event manager to run main loop");
-	OnionTraceEventManager* manager = oniontraceeventmanager_new();
-    if(manager == NULL) {
+    message("Creating event manager to run main loop");
+    OnionTraceEventManager* manager = oniontraceeventmanager_new();
+    if (manager == NULL) {
         message("Creating event manager failed, exiting with failure");
         return EXIT_FAILURE;
     }
@@ -79,17 +79,19 @@ int main(int argc, char *argv[]) {
     OnionTraceRecorder* recorder = NULL;
     gboolean success = TRUE;
 
-    if(mode == ONIONTRACE_MODE_RECORD) {
+    if (mode == ONIONTRACE_MODE_RECORD) {
         message("Starting in record mode, creating recorder");
 
         recorder = oniontracerecorder_new(config, manager);
-        if(recorder == NULL) {
+        if (recorder == NULL) {
             message("Creating recorder failed, exiting with failure");
             success = FALSE;
+        } else {
+            success = oniontracerecorder_start(recorder);
         }
     }
 
-    if(success) {
+    if (success) {
         /* the recorder should be waiting for circuit and stream events, and
          * when those occur, new actions will be taken. */
         message("Running main loop");
@@ -97,13 +99,14 @@ int main(int argc, char *argv[]) {
         message("Main loop returned, cleaning up");
     }
 
-	if(recorder != NULL) {
+    if (recorder != NULL) {
+        oniontracerecorder_stop(recorder);
         oniontracerecorder_free(recorder);
-	}
+    }
 
-	oniontraceeventmanager_free(manager);
-	oniontraceconfig_free(config);
+    oniontraceeventmanager_free(manager);
+    oniontraceconfig_free(config);
 
-	message("Exiting cleanly with %s code", success ? "success" : "failure");
-	return success ? EXIT_SUCCESS : EXIT_FAILURE;
+    message("Exiting cleanly with %s code", success ? "success" : "failure");
+    return success ? EXIT_SUCCESS : EXIT_FAILURE;
 }

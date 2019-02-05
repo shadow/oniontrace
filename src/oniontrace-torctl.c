@@ -396,6 +396,9 @@ static void _oniontracetorctl_flushCommands(OnionTraceTorCtl* torctl, OnionTrace
                 sent = g_string_truncate(sent, bytes);
                 debug("%s: sent '%s'", torctl->id, g_strchomp(sent->str));
                 g_string_free(sent, TRUE);
+            } else if (bytes < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+                warning("%s: problem writing to descriptor %i: error %i: %s",
+                        torctl->id, torctl->descriptor, errno, g_strerror(errno));
             }
 
             if(bytes == command->len) {
@@ -464,7 +467,7 @@ OnionTraceTorCtl* oniontracetorctl_new(OnionTraceEventManager* manager, in_port_
 
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);;
-    serverAddress.sin_port = controlPort;
+    serverAddress.sin_port = htons(controlPort);
 
     /* connect to server. since we are non-blocking, we expect this to return EINPROGRESS */
     gint res = connect(torctl->descriptor, (struct sockaddr *) &serverAddress, sizeof(serverAddress));

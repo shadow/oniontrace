@@ -49,7 +49,7 @@ static gboolean _oniontraceconfig_parseTorControlPort(OnionTraceConfig* config, 
         return FALSE;
     }
 
-    config->torControlPort = (in_port_t)htons((in_port_t)port);
+    config->torControlPort = (in_port_t)port;
 
     return TRUE;
 }
