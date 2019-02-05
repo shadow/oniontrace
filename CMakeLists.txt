@@ -29,7 +29,7 @@ add_executable(oniontrace ${sources})
 
 ## this ensures it is linked as a position-independent executable so that
 ## the system calls can be intercepted (so that it works in Shadow)
-set_target_properties(${target} PROPERTIES 
+set_target_properties(oniontrace PROPERTIES 
     INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/lib 
     INSTALL_RPATH_USE_LINK_PATH TRUE 
     LINK_FLAGS "-pie -rdynamic -Wl,--no-as-needed"
