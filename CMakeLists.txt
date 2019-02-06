@@ -20,6 +20,7 @@ set(sources
     src/oniontrace-driver.c
     src/oniontrace-event-manager.c
     src/oniontrace-peer.c
+    src/oniontrace-player.c
     src/oniontrace-recorder.c
     src/oniontrace-timer.c
     src/oniontrace-torctl.c

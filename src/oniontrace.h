@@ -28,6 +28,7 @@
 #include "oniontrace-peer.h"
 #include "oniontrace-timer.h"
 #include "oniontrace-torctl.h"
+#include "oniontrace-player.h"
 #include "oniontrace-recorder.h"
 #include "oniontrace-driver.h"
 

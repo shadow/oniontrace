@@ -27,6 +27,7 @@ struct _OnionTraceDriver {
 
     OnionTraceTorCtl* torctl;
     OnionTraceRecorder* recorder;
+    OnionTracePlayer* player;
 };
 
 const gchar* _oniontracedriver_stateToString(OnionTraceDriverState state) {
@@ -63,16 +64,17 @@ static void _oniontracedriver_heartbeat(OnionTraceDriver* driver, gpointer unuse
     g_string_append_printf(msg, "%s: heartbeat: state=%s",
             driver->id, _oniontracedriver_stateToString(driver->state));
 
+    gchar* status = NULL;
+
     if(driver->state == ONIONTRACE_DRIVER_RECORDING && driver->recorder != NULL) {
-        gchar* recorderStatus = oniontracerecorder_toString(driver->recorder);
+        status = oniontracerecorder_toString(driver->recorder);
+    } else if(driver->state == ONIONTRACE_DRIVER_PLAYING && driver->player != NULL) {
+        status = oniontraceplayer_toString(driver->player);
+    }
 
-        g_string_append_printf(msg, " %s", recorderStatus);
-
-        if(recorderStatus) {
-            g_free(recorderStatus);
-        }
-    } else if(driver->state == ONIONTRACE_DRIVER_PLAYING) {
-
+    if(status) {
+        g_string_append_printf(msg, " %s", status);
+        g_free(status);
     }
 
     message("%s", msg->str);
@@ -106,17 +108,8 @@ static void _oniontracedriver_onBootstrapped(OnionTraceDriver* driver) {
         driver->recorder = oniontracerecorder_new(driver->torctl);
         driver->state = ONIONTRACE_DRIVER_RECORDING;
     } else {
+        driver->player = oniontraceplayer_new(driver->torctl);
         driver->state = ONIONTRACE_DRIVER_PLAYING;
-//        /* we will watch status on circuits and streams asynchronously.
-//         * set this before we tell Tor to stop attaching streams for us. */
-//        oniontracetorctl_setCircuitStatusCallback(driver->torctl,
-//                (OnCircuitStatusFunc)_oniontracedriver_onCircuitStatus, driver);
-//        oniontracetorctl_setStreamStatusCallback(driver->torctl,
-//                (OnStreamStatusFunc)_oniontracedriver_onStreamStatus, driver);
-//        /* set the config for Tor so streams stay unattached */
-//        oniontracetorctl_commandSetupTorConfig(recorder->torctl);
-//        /* start watching for circuit and stream events */
-//        oniontracetorctl_commandEnableEvents(driver->torctl);
     }
 }
 
@@ -193,6 +186,11 @@ gboolean oniontracedriver_stop(OnionTraceDriver* driver) {
         driver->recorder = NULL;
     }
 
+    if(driver->player) {
+        oniontraceplayer_free(driver->player);
+        driver->player = NULL;
+    }
+
     if(driver->heartbeatTimer) {
         oniontracetimer_free(driver->heartbeatTimer);
         driver->heartbeatTimer = NULL;
@@ -232,6 +230,10 @@ void oniontracedriver_free(OnionTraceDriver* driver) {
 
     if(driver->recorder) {
         oniontracerecorder_free(driver->recorder);
+    }
+
+    if(driver->player) {
+        oniontraceplayer_free(driver->player);
     }
 
     if(driver->heartbeatTimer) {
