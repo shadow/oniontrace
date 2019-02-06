@@ -26,9 +26,10 @@
 #include "oniontrace-config.h"
 #include "oniontrace-event-manager.h"
 #include "oniontrace-peer.h"
-#include "oniontrace-recorder.h"
 #include "oniontrace-timer.h"
 #include "oniontrace-torctl.h"
+#include "oniontrace-recorder.h"
+#include "oniontrace-driver.h"
 
 /* logging facility */
 void oniontrace_log(GLogLevelFlags level, const gchar* functionName, const gchar* format, ...);

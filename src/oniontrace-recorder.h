@@ -5,15 +5,13 @@
 #ifndef SRC_ONIONTRACE_RECORDER_H_
 #define SRC_ONIONTRACE_RECORDER_H_
 
-#include "oniontrace-config.h"
-#include "oniontrace-event-manager.h"
+#include "oniontrace-torctl.h"
 
 typedef struct _OnionTraceRecorder OnionTraceRecorder;
 
-OnionTraceRecorder* oniontracerecorder_new(OnionTraceConfig* config, OnionTraceEventManager* manager);
-void oniontracerecorder_free(OnionTraceRecorder* authority);
+OnionTraceRecorder* oniontracerecorder_new(OnionTraceTorCtl* torctl);
+void oniontracerecorder_free(OnionTraceRecorder* recorder);
 
-gboolean oniontracerecorder_start(OnionTraceRecorder* recorder);
-gboolean oniontracerecorder_stop(OnionTraceRecorder* recorder);
+gchar* oniontracerecorder_toString(OnionTraceRecorder* recorder);
 
 #endif /* SRC_ONIONTRACE_RECORDER_H_ */

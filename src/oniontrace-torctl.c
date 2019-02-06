@@ -206,7 +206,7 @@ static void _oniontracetorctl_processLineHelper(OnionTraceTorCtl* torctl, GStrin
             g_strfreev(parts);
 
             if(torctl->onCircuitStatus) {
-                torctl->onCircuitStatus(torctl->onCircuitStatusArg, CIRCUIT_STATUS_ASSIGNED, circuitID);
+                torctl->onCircuitStatus(torctl->onCircuitStatusArg, CIRCUIT_STATUS_ASSIGNED, circuitID, NULL);
             }
         }
     } else if(code == 650) {
@@ -221,18 +221,31 @@ static void _oniontracetorctl_processLineHelper(OnionTraceTorCtl* torctl, GStrin
 
             gint circuitID = 0;
             CircuitStatus status = CIRCUIT_STATUS_NONE;
+            gchar* path = NULL;
 
             if(parts[0] && parts[1] && parts[2]) {
                 circuitID = atoi(parts[2]);
                 if(parts[3]) {
                     status = _oniontracetorctl_parseCircuitStatus(parts[3]);
+
+                    /* get path if we can */
+                    if(status == CIRCUIT_STATUS_EXTENDED ||
+                            status == CIRCUIT_STATUS_BUILT ||
+                            status == CIRCUIT_STATUS_CLOSED) {
+                        if(parts[4]) {
+                            path = g_strdup(parts[4]);
+                        }
+                    }
                 }
             }
 
             g_strfreev(parts);
 
             if(torctl->onCircuitStatus) {
-                torctl->onCircuitStatus(torctl->onCircuitStatusArg, status, circuitID);
+                torctl->onCircuitStatus(torctl->onCircuitStatusArg, status, circuitID, path);
+            }
+            if(path != NULL) {
+                g_free(path);
             }
         } else if(!g_ascii_strncasecmp(linebuf->str, "650 STREAM ", MIN(linebuf->len, 11))) {
             gchar** parts = g_strsplit(linebuf->str, " ", 0);
@@ -611,7 +624,7 @@ static void _oniontracetorctl_commandWatchBootstrapStatus(OnionTraceTorCtl* torc
 
 void oniontracetorctl_commandSetupTorConfig(OnionTraceTorCtl* torctl) {
     g_assert(torctl);
-    _oniontracetorctl_commandHelper(torctl, "SETCONF __LeaveStreamsUnattached=1 __DisablePredictedCircuits=1 MaxCircuitDirtiness=36000 CircuitStreamTimeout=3600\r\n");
+    _oniontracetorctl_commandHelper(torctl, "SETCONF __LeaveStreamsUnattached=1 __DisablePredictedCircuits=1\r\n");
     _oniontracetorctl_commandHelper(torctl, "SIGNAL NEWNYM\r\n");
 }
 

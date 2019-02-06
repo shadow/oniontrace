@@ -76,19 +76,17 @@ int main(int argc, char *argv[]) {
     }
 
     OnionTraceMode mode = oniontraceconfig_getMode(config);
-    OnionTraceRecorder* recorder = NULL;
+    OnionTraceDriver* driver = NULL;
     gboolean success = TRUE;
 
-    if (mode == ONIONTRACE_MODE_RECORD) {
-        message("Starting in record mode, creating recorder");
+    message("Creating driver");
 
-        recorder = oniontracerecorder_new(config, manager);
-        if (recorder == NULL) {
-            message("Creating recorder failed, exiting with failure");
-            success = FALSE;
-        } else {
-            success = oniontracerecorder_start(recorder);
-        }
+    driver = oniontracedriver_new(config, manager);
+    if (driver == NULL) {
+        message("Creating driver failed, exiting with failure");
+        success = FALSE;
+    } else {
+        success = oniontracedriver_start(driver);
     }
 
     if (success) {
@@ -99,9 +97,9 @@ int main(int argc, char *argv[]) {
         message("Main loop returned, cleaning up");
     }
 
-    if (recorder != NULL) {
-        oniontracerecorder_stop(recorder);
-        oniontracerecorder_free(recorder);
+    if (driver != NULL) {
+        oniontracedriver_stop(driver);
+        oniontracedriver_free(driver);
     }
 
     oniontraceeventmanager_free(manager);

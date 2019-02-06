@@ -17,6 +17,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -std=gnu11")
 set(sources
     src/oniontrace.c
     src/oniontrace-config.c
+    src/oniontrace-driver.c
     src/oniontrace-event-manager.c
     src/oniontrace-peer.c
     src/oniontrace-recorder.c
