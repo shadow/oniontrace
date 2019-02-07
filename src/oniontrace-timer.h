@@ -20,4 +20,7 @@ gboolean oniontracetimer_check(OnionTraceTimer* timer);
 
 gint oniontracetimer_getFD(OnionTraceTimer* timer);
 
+int oniontracetimer_timespecdiff(struct timespec *result,
+        struct timespec *start, struct timespec *stop);
+
 #endif /* SRC_ONIONTRACE_TIMER_H_ */

@@ -39,7 +39,7 @@ typedef void (*OnBootstrappedFunc)(gpointer userData);
 typedef void (*OnDescriptorsReceivedFunc)(gpointer userData, GQueue* descriptorLines);
 
 typedef void (*OnCircuitStatusFunc)(gpointer userData, CircuitStatus status, gint circuitID, gchar* path);
-typedef void (*OnStreamStatusFunc)(gpointer userData, StreamStatus status, gint circuitID, gint streamID, in_port_t sourcePort);
+typedef void (*OnStreamStatusFunc)(gpointer userData, StreamStatus status, gint circuitID, gint streamID, gchar* username);
 
 OnionTraceTorCtl* oniontracetorctl_new(OnionTraceEventManager* manager, in_port_t controlPort,
         OnConnectedFunc onConnected, gpointer onConnectedArg);

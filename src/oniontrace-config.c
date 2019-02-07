@@ -8,6 +8,7 @@ struct _OnionTraceConfig {
     /* See the README file for explanation of these arguments */
     OnionTraceMode mode;
 
+    gint runTimeSeconds;
     in_port_t torControlPort;
     GLogLevelFlags logLevel;
     gchar* filename;
@@ -54,6 +55,16 @@ static gboolean _oniontraceconfig_parseTorControlPort(OnionTraceConfig* config, 
     return TRUE;
 }
 
+static gboolean _oniontraceconfig_parseRunTimeSeconds(OnionTraceConfig* config, gchar* value) {
+    g_assert(config && value);
+
+    gint numSeconds = atoi(value);
+
+    config->runTimeSeconds = numSeconds;
+
+    return TRUE;
+}
+
 static gboolean _oniontraceconfig_parseLogLevel(OnionTraceConfig* config, gchar* value) {
     g_assert(config && value);
 
@@ -96,6 +107,7 @@ OnionTraceConfig* oniontraceconfig_new(gint argc, gchar* argv[]) {
 
     /* set defaults, which will get overwritten if set in args */
     config->mode = ONIONTRACE_MODE_RECORD;
+    config->runTimeSeconds = 0;
     config->logLevel = G_LOG_LEVEL_INFO;
     config->filename = g_strdup("oniontrace.csv");
 
@@ -123,6 +135,10 @@ OnionTraceConfig* oniontraceconfig_new(gint argc, gchar* argv[]) {
                 }
             } else if(!g_ascii_strcasecmp(key, "TraceFile")) {
                 if(!_oniontraceconfig_parseTraceFile(config, value)) {
+                    hasError = TRUE;
+                }
+            } else if(!g_ascii_strcasecmp(key, "RunTime")) {
+                if(!_oniontraceconfig_parseRunTimeSeconds(config, value)) {
                     hasError = TRUE;
                 }
             } else {
@@ -189,6 +205,11 @@ void oniontraceconfig_free(OnionTraceConfig* config) {
 in_port_t oniontraceconfig_getTorControlPort(OnionTraceConfig* config) {
     g_assert(config);
     return config->torControlPort;
+}
+
+gint oniontraceconfig_getRunTimeSeconds(OnionTraceConfig* config) {
+    g_assert(config);
+    return config->runTimeSeconds;
 }
 
 GLogLevelFlags oniontraceconfig_getLogLevel(OnionTraceConfig* config) {

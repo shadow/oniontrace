@@ -23,6 +23,7 @@ struct _OnionTraceDriver {
     OnionTraceDriverState state;
     gchar* id;
     OnionTraceTimer* heartbeatTimer;
+    OnionTraceTimer* shutdownTimer;
     struct timespec nowCached;
 
     OnionTraceTorCtl* torctl;
@@ -52,6 +53,20 @@ static void _oniontracedriver_genericTimerReadable(OnionTraceTimer* timer, Onion
         warning("Authority unable to execute timer callback function. "
                 "The timer might trigger again since we did not delete it.");
     }
+}
+
+static void _oniontracedriver_shutdown(OnionTraceDriver* driver, gpointer unused) {
+    g_assert(driver);
+    oniontraceeventmanager_stopMainLoop(driver->manager);
+}
+
+static void _oniontracedriver_registerShutdown(OnionTraceDriver* driver, guint seconds) {
+    driver->shutdownTimer = oniontracetimer_new((GFunc)_oniontracedriver_shutdown, driver, NULL);
+    oniontracetimer_arm(driver->shutdownTimer, seconds, 0);
+
+    gint timerFD = oniontracetimer_getFD(driver->shutdownTimer);
+    oniontraceeventmanager_register(driver->manager, timerFD, ONIONTRACE_EVENT_READ,
+            (OnionTraceOnEventFunc)_oniontracedriver_genericTimerReadable, driver->shutdownTimer);
 }
 
 static void _oniontracedriver_heartbeat(OnionTraceDriver* driver, gpointer unused) {
@@ -104,12 +119,22 @@ static void _oniontracedriver_onBootstrapped(OnionTraceDriver* driver) {
 
     message("%s: successfully bootstrapped client port %u", driver->id, clientPort);
 
+    const gchar* filename = oniontraceconfig_getTraceFileName(driver->config);
+
     if(oniontraceconfig_getMode(driver->config) == ONIONTRACE_MODE_RECORD) {
-        driver->recorder = oniontracerecorder_new(driver->torctl);
         driver->state = ONIONTRACE_DRIVER_RECORDING;
+        driver->recorder = oniontracerecorder_new(driver->torctl, filename);
+        if(!driver->recorder) {
+            critical("Unable to create recorder instance! We will be useless!");
+            driver->state = ONIONTRACE_DRIVER_IDLE;
+        }
     } else {
-        driver->player = oniontraceplayer_new(driver->torctl);
         driver->state = ONIONTRACE_DRIVER_PLAYING;
+        driver->player = oniontraceplayer_new(driver->torctl, filename);
+        if(!driver->player) {
+            critical("Unable to create player instance! We will be useless!");
+            driver->state = ONIONTRACE_DRIVER_IDLE;
+        }
     }
 }
 
@@ -170,6 +195,11 @@ gboolean oniontracedriver_start(OnionTraceDriver* driver) {
     /* now set up the heartbeat so we can log progress over time */
     _oniontracedriver_registerHeartbeat(driver);
 
+    gint runTimeSeconds = oniontraceconfig_getRunTimeSeconds(driver->config);
+    if(runTimeSeconds > 0) {
+        _oniontracedriver_registerShutdown(driver, runTimeSeconds);
+    }
+
     return TRUE;
 }
 
@@ -182,6 +212,7 @@ gboolean oniontracedriver_stop(OnionTraceDriver* driver) {
     }
 
     if(driver->recorder) {
+        /* note that this free() call will record any in-progress circuits to file */
         oniontracerecorder_free(driver->recorder);
         driver->recorder = NULL;
     }
@@ -196,13 +227,14 @@ gboolean oniontracedriver_stop(OnionTraceDriver* driver) {
         driver->heartbeatTimer = NULL;
     }
 
+    if(driver->shutdownTimer) {
+        oniontracetimer_free(driver->shutdownTimer);
+        driver->shutdownTimer = NULL;
+    }
+
     if(driver->torctl) {
         oniontracetorctl_free(driver->torctl);
         driver->torctl = NULL;
-    }
-
-    if(driver->state == ONIONTRACE_DRIVER_RECORDING && driver->recorder) {
-        // TODO write any file output?
     }
 
     driver->state = ONIONTRACE_DRIVER_IDLE;
@@ -238,6 +270,10 @@ void oniontracedriver_free(OnionTraceDriver* driver) {
 
     if(driver->heartbeatTimer) {
         oniontracetimer_free(driver->heartbeatTimer);
+    }
+
+    if(driver->shutdownTimer) {
+        oniontracetimer_free(driver->shutdownTimer);
     }
 
     if(driver->torctl) {

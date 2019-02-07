@@ -129,6 +129,16 @@ static in_port_t _oniontracetorctl_scanSourcePort(gchar** parts) {
     return sourcePort;
 }
 
+static gchar* _oniontracetorctl_scanUsername(gchar** parts) {
+    gchar* username = NULL;
+    for(gint i = 0; parts != NULL && parts[i] != NULL; i++) {
+        if(!g_ascii_strncasecmp(parts[i], "USERNAME=", 9)) {
+            username = g_strdup(&parts[i][9]);
+        }
+    }
+    return username;
+}
+
 static StreamStatus _oniontracetorctl_parseStreamStatus(gchar* statusStr) {
     if(statusStr != NULL) {
         if(!g_ascii_strncasecmp(statusStr, "NEW", 3)) {
@@ -253,20 +263,26 @@ static void _oniontracetorctl_processLineHelper(OnionTraceTorCtl* torctl, GStrin
             gint streamID = 0, circuitID = 0;
             in_port_t clientPort = 0;
             StreamStatus status = STREAM_STATUS_NONE;
+            gchar* username = NULL;
 
             if(parts[0] && parts[1] && parts[2]) {
                 streamID = atoi(parts[2]);
                 if(parts[3] && parts[4]) {
                     status = _oniontracetorctl_parseStreamStatus(parts[3]);
                     circuitID = atoi(parts[4]);
+                    /* note: the sourcePort is only valid for STREAM_STATUS_NEW, otherwise its 0 */
                     clientPort = _oniontracetorctl_scanSourcePort(&parts[5]);
+                    username = _oniontracetorctl_scanUsername(&parts[5]);
                 }
             }
 
             g_strfreev(parts);
 
             if(torctl->onStreamStatus) {
-                torctl->onStreamStatus(torctl->onStreamStatusArg, status, circuitID, streamID, clientPort);
+                torctl->onStreamStatus(torctl->onStreamStatusArg, status, circuitID, streamID, username);
+            }
+            if(username) {
+                g_free(username);
             }
         }
     } else {

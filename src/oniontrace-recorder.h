@@ -9,7 +9,7 @@
 
 typedef struct _OnionTraceRecorder OnionTraceRecorder;
 
-OnionTraceRecorder* oniontracerecorder_new(OnionTraceTorCtl* torctl);
+OnionTraceRecorder* oniontracerecorder_new(OnionTraceTorCtl* torctl, const gchar* filename);
 void oniontracerecorder_free(OnionTraceRecorder* recorder);
 
 gchar* oniontracerecorder_toString(OnionTraceRecorder* recorder);

@@ -19,7 +19,7 @@ struct _OnionTracePlayer {
 };
 
 static void _oniontraceplayer_onStreamStatus(OnionTracePlayer* player,
-        StreamStatus status, gint circuitID, gint streamID, in_port_t sourcePort) {
+        StreamStatus status, gint circuitID, gint streamID, gchar* username) {
     g_assert(player);
 
     /* note: the sourcePort is only valid for STREAM_STATUS_NEW, otherwise its 0 */
@@ -95,7 +95,7 @@ gchar* oniontraceplayer_toString(OnionTracePlayer* player) {
     return NULL;
 }
 
-OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl) {
+OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl, const gchar* filename) {
     OnionTracePlayer* player = g_new0(OnionTracePlayer, 1);
 
     player->torctl = torctl;

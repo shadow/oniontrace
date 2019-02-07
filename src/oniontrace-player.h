@@ -9,7 +9,7 @@
 
 typedef struct _OnionTracePlayer OnionTracePlayer;
 
-OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl);
+OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl, const gchar* filename);
 void oniontraceplayer_free(OnionTracePlayer* player);
 
 gchar* oniontraceplayer_toString(OnionTracePlayer* player);

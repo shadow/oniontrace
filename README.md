@@ -43,4 +43,9 @@ The following are **optional** arguments (default values exist):
  + `TraceFile`:String (default=`oniontrace.csv`) [Mode=`record`,`play`]  
    The filename to write the trace when in `record` mode, or read a previously  
    recorded trace when in `play` mode.
-   
+
+ + `RunTime`:Integer (default=`0`) [Mode=`record`,`play`]  
+   If positive, OnionTrace will stop running after the number of seconds  
+   specified in this value. In `record` mode, this has the effect of recording  
+   all circuits that are being tracked even if those circuits have not yet  
+   been closed by Tor.  

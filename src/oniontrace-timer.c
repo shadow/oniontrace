@@ -103,3 +103,31 @@ void oniontracetimer_free(OnionTraceTimer* timer) {
     close(timer->timerFD);
     g_free(timer);
 }
+
+/* adapted from the libc manual for diffing timevals to be compat with timespec
+ *
+ * Subtract the ‘struct timespec’ values X and Y,
+ * storing the result in RESULT.
+ * Return 1 if the difference is negative, otherwise 0. */
+int oniontracetimer_timespecdiff(struct timespec *result,
+        struct timespec *start, struct timespec *stop) {
+    /* Perform the carry for the later subtraction by updating start. */
+    if (stop->tv_nsec < start->tv_nsec) {
+        long nsec = (start->tv_nsec - stop->tv_nsec) / 1000000000 + 1;
+        start->tv_nsec -= 1000000000 * nsec;
+        start->tv_sec += nsec;
+    }
+    if (stop->tv_nsec - start->tv_nsec > 1000000000) {
+        long nsec = (stop->tv_nsec - start->tv_nsec) / 1000000000;
+        start->tv_nsec += 1000000000 * nsec;
+        start->tv_sec -= nsec;
+    }
+
+    /* Compute the time remaining to wait.
+     tv_nsec is certainly positive. */
+    result->tv_sec = stop->tv_sec - start->tv_sec;
+    result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+
+    /* Return 1 if result is negative. */
+    return stop->tv_sec < start->tv_sec;
+}

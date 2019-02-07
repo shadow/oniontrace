@@ -22,6 +22,7 @@ void oniontraceconfig_free(OnionTraceConfig* config);
 OnionTraceMode oniontraceconfig_getMode(OnionTraceConfig* config);
 GLogLevelFlags oniontraceconfig_getLogLevel(OnionTraceConfig* config);
 in_port_t oniontraceconfig_getTorControlPort(OnionTraceConfig* config);
+gint oniontraceconfig_getRunTimeSeconds(OnionTraceConfig* config);
 const gchar* oniontraceconfig_getTraceFileName(OnionTraceConfig* config);
 
 #endif /* SRC_ONIONTRACE_CONFIG_H_ */
