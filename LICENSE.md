@@ -1,32 +1,31 @@
-As a work of the United States Government, this project is in the
-public domain within the United States.
+DISTRIBUTION STATEMENT
 
-Additionally, we waive copyright and related rights in the work
-worldwide through the CC0 1.0 Universal public domain dedication.
+Approved for public release: distribution unlimited.
 
-## CC0 1.0 Universal Summary
+Redistributions of source and binary forms, with or without
+modification, are permitted if redistributions retain the above
+distribution statement and the following disclaimer.
 
-This is a human-readable summary of the
-[Legal Code (read the full text)](https://creativecommons.org/publicdomain/zero/1.0/legalcode).
+DISCLAIMER
 
-### No Copyright
+THE SOFTWARE IS SUPPLIED “AS IS” WITHOUT WARRANTY OF ANY KIND.
 
-The person who associated a work with this deed has dedicated the work to
-the public domain by waiving all of his or her rights to the work worldwide
-under copyright law, including all related and neighboring rights, to the
-extent allowed by law.
+AS THE OWNER OF THE SOFTWARE, THE UNITED STATES, THE UNITED STATES
+DEPARTMENT OF DEFENSE, AND THEIR EMPLOYEES: (1) DISCLAIM ANY
+WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY
+IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+PURPOSE, TITLE OR NON-INFRINGEMENT, (2) DO NOT ASSUME ANY LEGAL
+LIABILITY OR RESPONSIBILITY FOR THE ACCURACY, COMPLETENESS, OR
+USEFULNESS OF THE SOFTWARE, (3) DO NOT REPRESENT THAT USE OF THE
+SOFTWARE WOULD NOT INFRINGE PRIVATELY OWNED RIGHTS, (4) DO NOT WARRANT
+THAT THE SOFTWARE WILL FUNCTION UNINTERRUPTED, THAT IT IS ERROR-FREE
+OR THAT ANY ERRORS WILL BE CORRECTED.
 
-You can copy, modify, distribute and perform the work, even for commercial
-purposes, all without asking permission.
+PORTIONS OF THE SOFTWARE RESULTED FROM WORK DEVELOPED BY OR FOR THE
+U.S. GOVERNMENT SUBJECT TO THE FOLLOWING LICENSE: THE GOVERNMENT IS
+GRANTED FOR ITSELF AND OTHERS ACTING ON ITS BEHALF A PAID-UP,
+NONEXCLUSIVE, IRREVOCABLE WORLDWIDE LICENSE IN THIS COMPUTER SOFTWARE
+TO REPRODUCE, PREPARE DERIVATIVE WORKS, TO PERFORM OR DISPLAY ANY
+PORTION OF THAT WORK, AND TO PERMIT OTHERS TO DO SO FOR GOVERNMENT
+PURPOSES.
 
-### Other Information
-
-In no way are the patent or trademark rights of any person affected by CC0,
-nor are the rights that other persons may have in the work or in how the
-work is used, such as publicity or privacy rights.
-
-Unless expressly stated otherwise, the person who associated a work with
-this deed makes no warranties about the work, and disclaims liability for
-all uses of the work, to the fullest extent permitted by applicable law.
-When using or citing the work, you should not imply endorsement by the
-author or the affirmer.
