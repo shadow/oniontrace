@@ -66,7 +66,7 @@ void oniontracetorctl_commandSetupTorConfig(OnionTraceTorCtl* torctl);
 void oniontracetorctl_commandEnableEvents(OnionTraceTorCtl* torctl);
 void oniontracetorctl_commandDisableEvents(OnionTraceTorCtl* torctl);
 
-void oniontracetorctl_commandBuildNewCircuit(OnionTraceTorCtl* torctl, gchar* path);
+void oniontracetorctl_commandBuildNewCircuit(OnionTraceTorCtl* torctl, const gchar* path);
 void oniontracetorctl_commandAttachStreamToCircuit(OnionTraceTorCtl* torctl, gint streamID, gint circuitID);
 
 void oniontracetorctl_commandCloseCircuit(OnionTraceTorCtl* torctl, gint crcuitID);

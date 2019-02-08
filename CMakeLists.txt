@@ -16,9 +16,11 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -std=gnu11")
 ## OnionTrace source files
 set(sources
     src/oniontrace.c
+    src/oniontrace-circuit.c
     src/oniontrace-config.c
     src/oniontrace-driver.c
     src/oniontrace-event-manager.c
+    src/oniontrace-file.c
     src/oniontrace-peer.c
     src/oniontrace-player.c
     src/oniontrace-recorder.c

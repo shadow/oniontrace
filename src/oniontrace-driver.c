@@ -31,6 +31,9 @@ struct _OnionTraceDriver {
     OnionTracePlayer* player;
 };
 
+/* forward declaration */
+static void _oniontracedriver_registerPlayTimer(OnionTraceDriver* driver);
+
 const gchar* _oniontracedriver_stateToString(OnionTraceDriverState state) {
     switch(state) {
         case ONIONTRACE_DRIVER_IDLE: return "IDLE";
@@ -40,6 +43,48 @@ const gchar* _oniontracedriver_stateToString(OnionTraceDriverState state) {
         case ONIONTRACE_DRIVER_RECORDING: return "RECORDING";
         case ONIONTRACE_DRIVER_PLAYING: return "PLAYING";
         default: return "NONE";
+    }
+}
+
+static void _oniontracedriver_playTimerReadable(OnionTraceTimer* timer, OnionTraceEventFlag type) {
+    g_assert(timer);
+    g_assert(type & ONIONTRACE_EVENT_READ);
+
+    /* if the timer triggered, this will call the timer callback function */
+    gboolean calledNotify = oniontracetimer_check(timer);
+    if(!calledNotify) {
+        warning("Authority unable to execute play timer callback function.");
+    }
+    /* free the timer since we don't track it anywhere else */
+    oniontracetimer_free(timer);
+}
+
+static void _oniontracedriver_playCallback(OnionTraceDriver* driver, gpointer unused) {
+    g_assert(driver);
+
+    /* build the circuit that we should be building now */
+    oniontraceplayer_launchNextCircuit(driver->player);
+
+    /* scheduler another timer for the next circuit */
+    _oniontracedriver_registerPlayTimer(driver);
+}
+
+static void _oniontracedriver_registerPlayTimer(OnionTraceDriver* driver) {
+    g_assert(driver);
+
+    /* compute the time until the next circuit should be created */
+    struct itimerspec armTime;
+    memset(&armTime, 0, sizeof(struct itimerspec));
+
+    gboolean hasCircuits = oniontraceplayer_getNextCircuitLaunchTime(driver->player, &armTime.it_value);
+
+    /* set up a timer so we build the circuit when we should */
+    if(hasCircuits) {
+        OnionTraceTimer* timer = oniontracetimer_new((GFunc)_oniontracedriver_playCallback, driver, NULL);
+        oniontracetimer_armGranular(timer, &armTime);
+        gint timerFD = oniontracetimer_getFD(timer);
+        oniontraceeventmanager_register(driver->manager, timerFD, ONIONTRACE_EVENT_READ,
+                (OnionTraceOnEventFunc)_oniontracedriver_playTimerReadable, timer);
     }
 }
 
@@ -125,16 +170,24 @@ static void _oniontracedriver_onBootstrapped(OnionTraceDriver* driver) {
         driver->state = ONIONTRACE_DRIVER_RECORDING;
         driver->recorder = oniontracerecorder_new(driver->torctl, filename);
         if(!driver->recorder) {
-            critical("Unable to create recorder instance! We will be useless!");
+            critical("%s: Error creating recorder instance, cannot proceed", driver->id);
             driver->state = ONIONTRACE_DRIVER_IDLE;
+            oniontraceeventmanager_stopMainLoop(driver->manager);
+            return;
         }
     } else {
         driver->state = ONIONTRACE_DRIVER_PLAYING;
+
         driver->player = oniontraceplayer_new(driver->torctl, filename);
         if(!driver->player) {
-            critical("Unable to create player instance! We will be useless!");
+            critical("%s: Error creating player instance, cannot proceed", driver->id);
             driver->state = ONIONTRACE_DRIVER_IDLE;
+            oniontraceeventmanager_stopMainLoop(driver->manager);
+            return;
         }
+
+        /* start a timer to start off our circuit building schedule */
+        _oniontracedriver_registerPlayTimer(driver);
     }
 }
 

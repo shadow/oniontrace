@@ -14,57 +14,11 @@ struct _OnionTraceRecorder {
 
     GHashTable* circuits;
 
-    FILE* tracefile;
+    OnionTraceFile* otfile;
 
     gsize circuitCountTotal;
     gsize streamCountTotal;
 };
-
-typedef struct _OnionTraceRecorderCircuit OnionTraceRecorderCircuit;
-struct _OnionTraceRecorderCircuit {
-    gint circuitID;
-    struct timespec launchTime;
-    gchar* path;
-    gchar* sessionID;
-    guint numStreams;
-};
-
-static OnionTraceRecorderCircuit* _oniontracerecorder_newCircuit(gint circuitID) {
-    OnionTraceRecorderCircuit* circuit = g_new0(OnionTraceRecorderCircuit, 1);
-    circuit->circuitID = circuitID;
-    clock_gettime(CLOCK_REALTIME, &circuit->launchTime);
-    return circuit;
-}
-
-static void _oniontracerecorder_freeCircuit(OnionTraceRecorderCircuit* circuit) {
-    g_assert(circuit);
-    if(circuit->path) {
-        g_free(circuit->path);
-    }
-    if(circuit->sessionID) {
-        g_free(circuit->sessionID);
-    }
-    g_free(circuit);
-}
-
-static void _oniontracerecorder_recordCircuit(OnionTraceRecorder* recorder, OnionTraceRecorderCircuit* circuit) {
-    if(recorder && circuit && recorder->tracefile) {
-        struct timespec elapsed;
-        oniontracetimer_timespecdiff(&elapsed, &recorder->startTime, &circuit->launchTime);
-
-        GString* string = g_string_new("");
-
-        g_string_append_printf(string, "%"G_GSIZE_FORMAT".%09"G_GSIZE_FORMAT";%s;%s\n",
-                (gsize)elapsed.tv_sec, (gsize)elapsed.tv_nsec,
-                circuit->sessionID ? circuit->sessionID : "NULL",
-                circuit->path ? circuit->path : "NULL");
-
-        fwrite(string->str, string->len, 1, recorder->tracefile);
-        fflush(recorder->tracefile);
-
-        g_string_free(string, TRUE);
-    }
-}
 
 static void _oniontracerecorder_onStreamStatus(OnionTraceRecorder* recorder,
         StreamStatus status, gint circuitID, gint streamID, gchar* username) {
@@ -72,25 +26,29 @@ static void _oniontracerecorder_onStreamStatus(OnionTraceRecorder* recorder,
 
     switch(status) {
         case STREAM_STATUS_SUCCEEDED: {
-            info("stream %i SUCCEEDED on circuit %i with username %s", streamID, circuitID, username);
+            info("%s: stream %i SUCCEEDED on circuit %i with username %s",
+                    recorder->id, streamID, circuitID, username);
             recorder->streamCountTotal++;
 
-            OnionTraceRecorderCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
+            OnionTraceCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
 
             if(circuit) {
-                circuit->numStreams++;
+                oniontracecircuit_incrementStreamCounter(circuit);
 
                 if(username) {
+                    const gchar* sessionID = oniontracecircuit_getSessionID(circuit);
+
                     /* store the username as the session ID for this circuit.
                      * if we got a second username, make sure they match */
-                    if(!circuit->sessionID) {
-                        info("storing username %s as session ID for circuit %i", username, circuitID);
-                        circuit->sessionID = g_strdup(username);
+                    if(!sessionID) {
+                        info("%s: storing username %s as session ID for circuit %i",
+                                recorder->id, username, circuitID);
+                        oniontracecircuit_setSessionID(circuit, g_strdup(username));
                     } else {
-                        if(g_ascii_strcasecmp(circuit->sessionID, username)) {
+                        if(g_ascii_strcasecmp(sessionID, username)) {
                             /* this means they do NOT match */
-                            warning("circuit %i with session ID %s was assigned a stream with username %s",
-                                    circuitID, circuit->sessionID, username);
+                            warning("%s: circuit %i with session ID %s was assigned a stream with username %s",
+                                    recorder->id, circuitID, sessionID, username);
                         }
                     }
                 }
@@ -129,30 +87,33 @@ static void _oniontracerecorder_onCircuitStatus(OnionTraceRecorder* recorder,
              * we will get multiple extended events, so only do this if we don't
              * already know about this circuit. */
             if(!g_hash_table_lookup(recorder->circuits, &circuitID)) {
-                info("storing new circuit %i", circuitID);
-                OnionTraceRecorderCircuit* circuit = _oniontracerecorder_newCircuit(circuitID);
-                g_hash_table_replace(recorder->circuits, &circuit->circuitID, circuit);
+                info("%s: storing new circuit %i", recorder->id, circuitID);
+
+                OnionTraceCircuit* circuit = oniontracecircuit_new();
+
+                struct timespec launchTime;
+                clock_gettime(CLOCK_REALTIME, &launchTime);
+                oniontracecircuit_setLaunchTime(circuit, &launchTime);
+                oniontracecircuit_setCircuitID(circuit, circuitID);
+
+                g_hash_table_replace(recorder->circuits, oniontracecircuit_getID(circuit), circuit);
             }
 
             break;
         }
 
         case CIRCUIT_STATUS_BUILT: {
-            info("circuit %i BUILT with path %s", circuitID, path);
+            info("%s: circuit %i BUILT with path %s", recorder->id, circuitID, path);
             recorder->circuitCountTotal++;
 
             /* now that we know the circuit was successfully built, we can store the path */
             if(path) {
-                OnionTraceRecorderCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
+                OnionTraceCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
 
                 if(circuit) {
-                    /* if we got a second path... keep the latest one */
-                    if(circuit->path) {
-                        g_free(circuit->path);
-                    }
-
-                    info("storing path %s for circuit %i", path, circuitID);
-                    circuit->path = g_strdup(path);
+                    /* if we got a second path... this will keep the latest one */
+                    info("%s: storing path %s for circuit %i", recorder->id, path, circuitID);
+                    oniontracecircuit_setPath(circuit, g_strdup(path));
                 }
             }
             break;
@@ -160,16 +121,16 @@ static void _oniontracerecorder_onCircuitStatus(OnionTraceRecorder* recorder,
 
         case CIRCUIT_STATUS_FAILED:
         case CIRCUIT_STATUS_CLOSED: {
-            info("circuit %i done for path %s", circuitID, path);
+            info("%s: circuit %i done for path %s", recorder->id, circuitID, path);
 
-            OnionTraceRecorderCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
+            OnionTraceCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
             if(circuit) {
                 /* write the circuit record to disk */
-                _oniontracerecorder_recordCircuit(recorder, circuit);
+                oniontracefile_writeCircuit(recorder->otfile, circuit, &recorder->startTime);
 
                 /* remove it from our table, which will also free the circuit memory */
-                info("removing and freeing circuit %i", circuitID);
-                g_hash_table_remove(recorder->circuits, &circuit->circuitID);
+                info("%s: removing and freeing circuit %i", recorder->id, circuitID);
+                g_hash_table_remove(recorder->circuits, &circuitID);
             }
 
             break;
@@ -192,10 +153,10 @@ gchar* oniontracerecorder_toString(OnionTraceRecorder* recorder) {
 
     g_hash_table_iter_init(&iter, recorder->circuits);
     while (g_hash_table_iter_next(&iter, &key, &value)) {
-        OnionTraceRecorderCircuit* circuit = value;
+        OnionTraceCircuit* circuit = value;
         if(circuit) {
             circuitCountActive++;
-            streamCountActive += circuit->numStreams;
+            streamCountActive += oniontracecircuit_getStreamCounter(circuit);
         }
     }
 
@@ -208,17 +169,15 @@ gchar* oniontracerecorder_toString(OnionTraceRecorder* recorder) {
 }
 
 OnionTraceRecorder* oniontracerecorder_new(OnionTraceTorCtl* torctl, const gchar* filename) {
-    FILE* tracefile = fopen(filename, "w");
-    if(!tracefile) {
-        warning("Failed to open tracefile for writing using path %s: error %i, %s",
-                filename, errno, g_strerror(errno));
+    OnionTraceFile* otfile = oniontracefile_newWriter(filename);
+    if(!otfile) {
         return NULL;
     }
 
     OnionTraceRecorder* recorder = g_new0(OnionTraceRecorder, 1);
 
     recorder->torctl = torctl;
-    recorder->tracefile = tracefile;
+    recorder->otfile = otfile;
 
     clock_gettime(CLOCK_REALTIME, &recorder->startTime);
 
@@ -227,7 +186,7 @@ OnionTraceRecorder* oniontracerecorder_new(OnionTraceTorCtl* torctl, const gchar
     recorder->id = g_string_free(idbuf, FALSE);
 
     recorder->circuits = g_hash_table_new_full(g_int_hash, g_int_equal, NULL,
-            (GDestroyNotify)_oniontracerecorder_freeCircuit);
+            (GDestroyNotify)oniontracecircuit_free);
 
     /* we will watch status on circuits and streams asynchronously.
      * set these before we start listening for circuit and stream events. */
@@ -252,14 +211,18 @@ void oniontracerecorder_free(OnionTraceRecorder* recorder) {
 
         g_hash_table_iter_init(&iter, recorder->circuits);
         while (g_hash_table_iter_next(&iter, &key, &value)) {
-            OnionTraceRecorderCircuit* circuit = value;
+            OnionTraceCircuit* circuit = value;
             if(circuit) {
-                _oniontracerecorder_recordCircuit(recorder, circuit);
+                oniontracefile_writeCircuit(recorder->otfile, circuit, &recorder->startTime);
             }
         }
 
         /* free all of the circuits */
         g_hash_table_destroy(recorder->circuits);
+    }
+
+    if(recorder->otfile) {
+        oniontracefile_free(recorder->otfile);
     }
 
     if(recorder->id) {

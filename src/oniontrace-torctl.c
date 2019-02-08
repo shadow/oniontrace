@@ -640,7 +640,7 @@ static void _oniontracetorctl_commandWatchBootstrapStatus(OnionTraceTorCtl* torc
 
 void oniontracetorctl_commandSetupTorConfig(OnionTraceTorCtl* torctl) {
     g_assert(torctl);
-    _oniontracetorctl_commandHelper(torctl, "SETCONF __LeaveStreamsUnattached=1 __DisablePredictedCircuits=1\r\n");
+    _oniontracetorctl_commandHelper(torctl, "SETCONF __LeaveStreamsUnattached=1 __DisablePredictedCircuits=1 MaxCircuitDirtiness=1200 CircuitStreamTimeout=1200\r\n");
     _oniontracetorctl_commandHelper(torctl, "SIGNAL NEWNYM\r\n");
 }
 
@@ -665,7 +665,7 @@ void oniontracetorctl_commandGetDescriptorInfo(OnionTraceTorCtl* torctl,
     _oniontracetorctl_commandHelper(torctl, "GETINFO ns/all\r\n");
 }
 
-void oniontracetorctl_commandBuildNewCircuit(OnionTraceTorCtl* torctl, gchar* path) {
+void oniontracetorctl_commandBuildNewCircuit(OnionTraceTorCtl* torctl, const gchar* path) {
     g_assert(torctl);
     g_assert(path);
     _oniontracetorctl_commandHelper(torctl, "EXTENDCIRCUIT 0 %s\r\n", path);
