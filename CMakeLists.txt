@@ -11,7 +11,7 @@ include_directories(AFTER ${GLIB_INCLUDES})
 
 ## plug-ins need to disable fortification to ensure syscalls are intercepted
 #add_cflags("-fPIC -fno-inline -fno-strict-aliasing -std=gnu11 -U_FORTIFY_SOURCE")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -std=gnu11")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -std=gnu11 -fno-omit-frame-pointer -ggdb -O2")
 
 ## OnionTrace source files
 set(sources
@@ -42,3 +42,6 @@ set_target_properties(oniontrace PROPERTIES
 ## link in our dependencies and install
 target_link_libraries(oniontrace ${GLIB_LIBRARIES})
 install(TARGETS oniontrace DESTINATION bin)
+
+message(STATUS "COMPILE_OPTIONS = ${CMAKE_C_FLAGS}")
+
