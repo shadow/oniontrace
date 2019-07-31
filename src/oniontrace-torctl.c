@@ -39,6 +39,8 @@ struct _OnionTraceTorCtl {
     gpointer onCircuitStatusArg;
     OnStreamStatusFunc onStreamStatus;
     gpointer onStreamStatusArg;
+    OnLineReceivedFunc onLineReceived;
+    gpointer onLineReceivedArg;
 
     gchar* id;
 };
@@ -337,7 +339,15 @@ static void _oniontracetorctl_processLine(OnionTraceTorCtl* torctl, GString* lin
         }
 
         case TORCTL_PROCESSING: {
-            _oniontracetorctl_processLineHelper(torctl, linebuf);
+            /* if someone (the logger) wants the raw line, send it */
+            if(torctl->onLineReceived) {
+                torctl->onLineReceived(torctl->onLineReceivedArg, linebuf->str);
+            }
+
+            /* we only need to parse the line if we actually have a function that cares about it */
+            if(torctl->onDescriptorsReceived || torctl->onCircuitStatus || torctl->onStreamStatus) {
+                _oniontracetorctl_processLineHelper(torctl, linebuf);
+            }
             break;
         }
 
@@ -590,6 +600,13 @@ void oniontracetorctl_setStreamStatusCallback(OnionTraceTorCtl* torctl,
     torctl->onStreamStatusArg = onStreamStatusArg;
 }
 
+void oniontracetorctl_setLineReceivedCallback(OnionTraceTorCtl* torctl,
+        OnLineReceivedFunc onLineReceived, gpointer onLineReceivedArg) {
+    g_assert(torctl);
+    torctl->onLineReceived = onLineReceived;
+    torctl->onLineReceivedArg = onLineReceivedArg;
+}
+
 static void _oniontracetorctl_commandHelperV(OnionTraceTorCtl* torctl, const gchar *format, va_list vargs) {
     g_assert(torctl);
 
@@ -644,9 +661,9 @@ void oniontracetorctl_commandSetupTorConfig(OnionTraceTorCtl* torctl) {
     _oniontracetorctl_commandHelper(torctl, "SIGNAL NEWNYM\r\n");
 }
 
-void oniontracetorctl_commandEnableEvents(OnionTraceTorCtl* torctl) {
+void oniontracetorctl_commandEnableEvents(OnionTraceTorCtl* torctl, const gchar* spaceDelimitedEvents) {
     g_assert(torctl);
-    _oniontracetorctl_commandHelper(torctl, "SETEVENTS CIRC STREAM\r\n");
+    _oniontracetorctl_commandHelper(torctl, "SETEVENTS %s\r\n", spaceDelimitedEvents);
 }
 
 void oniontracetorctl_commandDisableEvents(OnionTraceTorCtl* torctl) {

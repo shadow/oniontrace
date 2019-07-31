@@ -30,6 +30,7 @@
 #include "oniontrace-torctl.h"
 #include "oniontrace-circuit.h"
 #include "oniontrace-file.h"
+#include "oniontrace-logger.h"
 #include "oniontrace-player.h"
 #include "oniontrace-recorder.h"
 #include "oniontrace-driver.h"
@@ -37,7 +38,11 @@
 /* logging facility */
 void oniontrace_log(GLogLevelFlags level, const gchar* functionName, const gchar* format, ...);
 
+#ifdef DEBUG
 #define debug(...) oniontrace_log(G_LOG_LEVEL_DEBUG, __FUNCTION__, __VA_ARGS__)
+#else
+#define debug(...)
+#endif
 #define info(...) oniontrace_log(G_LOG_LEVEL_INFO, __FUNCTION__, __VA_ARGS__)
 #define message(...) oniontrace_log(G_LOG_LEVEL_MESSAGE, __FUNCTION__, __VA_ARGS__)
 #define warning(...) oniontrace_log(G_LOG_LEVEL_WARNING, __FUNCTION__, __VA_ARGS__)

@@ -41,6 +41,8 @@ typedef void (*OnDescriptorsReceivedFunc)(gpointer userData, GQueue* descriptorL
 typedef void (*OnCircuitStatusFunc)(gpointer userData, CircuitStatus status, gint circuitID, gchar* path);
 typedef void (*OnStreamStatusFunc)(gpointer userData, StreamStatus status, gint circuitID, gint streamID, gchar* username);
 
+typedef void (*OnLineReceivedFunc)(gpointer userData, gchar* line);
+
 OnionTraceTorCtl* oniontracetorctl_new(OnionTraceEventManager* manager, in_port_t controlPort,
         OnConnectedFunc onConnected, gpointer onConnectedArg);
 void oniontracetorctl_free(OnionTraceTorCtl* torctl);
@@ -52,6 +54,8 @@ void oniontracetorctl_setCircuitStatusCallback(OnionTraceTorCtl* torctl,
         OnCircuitStatusFunc onCircuitStatus, gpointer onCircuitStatusArg);
 void oniontracetorctl_setStreamStatusCallback(OnionTraceTorCtl* torctl,
         OnStreamStatusFunc onStreamStatus, gpointer onStreamStatusArg);
+void oniontracetorctl_setLineReceivedCallback(OnionTraceTorCtl* torctl,
+        OnLineReceivedFunc onLineReceived, gpointer onLineReceivedArg);
 
 /* controller commands with callbacks when they complete */
 void oniontracetorctl_commandAuthenticate(OnionTraceTorCtl* torctl,
@@ -63,7 +67,7 @@ void oniontracetorctl_commandGetDescriptorInfo(OnionTraceTorCtl* torctl,
 
 /* controller commands without callbacks */
 void oniontracetorctl_commandSetupTorConfig(OnionTraceTorCtl* torctl);
-void oniontracetorctl_commandEnableEvents(OnionTraceTorCtl* torctl);
+void oniontracetorctl_commandEnableEvents(OnionTraceTorCtl* torctl, const gchar* spaceDelimitedEvents);
 void oniontracetorctl_commandDisableEvents(OnionTraceTorCtl* torctl);
 
 void oniontracetorctl_commandBuildNewCircuit(OnionTraceTorCtl* torctl, const gchar* path);

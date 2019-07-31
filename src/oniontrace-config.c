@@ -12,6 +12,8 @@ struct _OnionTraceConfig {
     in_port_t torControlPort;
     GLogLevelFlags logLevel;
     gchar* filename;
+    /* space-delimited events like 'BW CIRC STREAM', suitable for sending in control command */
+    gchar* events;
 };
 
 static gchar* _oniontrace_getHomePath(const gchar* path) {
@@ -33,6 +35,8 @@ static gboolean _oniontraceconfig_parseMode(OnionTraceConfig* config, gchar* val
         config->mode = ONIONTRACE_MODE_RECORD;
     } else if(!g_ascii_strcasecmp(value, "play")) {
         config->mode = ONIONTRACE_MODE_PLAY;
+    } else if(!g_ascii_strcasecmp(value, "log")) {
+        config->mode = ONIONTRACE_MODE_LOG;
     } else {
         warning("invalid mode '%s' provided, see README for valid values", value);
         return FALSE;
@@ -100,16 +104,39 @@ static gboolean _oniontraceconfig_parseTraceFile(OnionTraceConfig* config, gchar
     return TRUE;
 }
 
+static gboolean _oniontraceconfig_parseCommaDelimitedEvents(OnionTraceConfig* config, gchar* value) {
+    g_assert(config && value);
+
+    /* turn the comma-delimited string input into a space-delimited string that
+     * is suitable to sending to the Tor control port in a 'SETEVENTS EVENT1 EVENT2'
+     * type of command. */
+    if(config->events) {
+        g_free(config->events);
+        config->events = NULL;
+    }
+
+    gchar** eventStrs = g_strsplit(value, ",", 0);
+    config->events = g_strjoinv(" ", eventStrs);
+    g_strfreev(eventStrs);
+
+    if(config->events) {
+        return TRUE;
+    } else {
+        return FALSE;
+    }
+}
+
 OnionTraceConfig* oniontraceconfig_new(gint argc, gchar* argv[]) {
     gboolean hasError = FALSE;
 
     OnionTraceConfig* config = g_new0(OnionTraceConfig, 1);
 
     /* set defaults, which will get overwritten if set in args */
-    config->mode = ONIONTRACE_MODE_RECORD;
+    config->mode = ONIONTRACE_MODE_LOG;
     config->runTimeSeconds = 0;
     config->logLevel = G_LOG_LEVEL_INFO;
     config->filename = g_strdup("oniontrace.csv");
+    config->events = g_strdup("BW");
 
     /* parse all of the key=value pairs, skip the first program name arg */
     for(gint i = 1; i < argc; i++) {
@@ -139,6 +166,10 @@ OnionTraceConfig* oniontraceconfig_new(gint argc, gchar* argv[]) {
                 }
             } else if(!g_ascii_strcasecmp(key, "RunTime")) {
                 if(!_oniontraceconfig_parseRunTimeSeconds(config, value)) {
+                    hasError = TRUE;
+                }
+            } else if(!g_ascii_strcasecmp(key, "Events")) {
+                if(!_oniontraceconfig_parseCommaDelimitedEvents(config, value)) {
                     hasError = TRUE;
                 }
             } else {
@@ -199,6 +230,10 @@ void oniontraceconfig_free(OnionTraceConfig* config) {
         g_free(config->filename);
     }
 
+    if(config->events) {
+        g_free(config->events);
+    }
+
     g_free(config);
 }
 
@@ -225,4 +260,9 @@ OnionTraceMode oniontraceconfig_getMode(OnionTraceConfig* config) {
 const gchar* oniontraceconfig_getTraceFileName(OnionTraceConfig* config) {
     g_assert(config);
     return config->filename ? config->filename : NULL;
+}
+
+const gchar* oniontraceconfig_getSpaceDelimitedEvents(OnionTraceConfig* config) {
+    g_assert(config);
+    return config->events ? config->events : NULL;
 }

@@ -196,7 +196,7 @@ OnionTraceRecorder* oniontracerecorder_new(OnionTraceTorCtl* torctl, const gchar
             (OnStreamStatusFunc)_oniontracerecorder_onStreamStatus, recorder);
 
     /* start watching for circuit and stream events */
-    oniontracetorctl_commandEnableEvents(recorder->torctl);
+    oniontracetorctl_commandEnableEvents(recorder->torctl, "CIRC STREAM");
 
     return recorder;
 }

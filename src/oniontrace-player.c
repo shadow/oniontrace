@@ -252,7 +252,7 @@ OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl, const gchar* fi
     oniontracetorctl_commandSetupTorConfig(player->torctl);
 
     /* start watching for circuit and stream events */
-    oniontracetorctl_commandEnableEvents(player->torctl);
+    oniontracetorctl_commandEnableEvents(player->torctl, "CIRC STREAM");
 
     /* the driver will drive the timer process so that we build
      * circuits according to the trace file */

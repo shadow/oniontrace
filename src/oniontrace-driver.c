@@ -12,6 +12,7 @@ enum _OnionTraceDriverState {
     ONIONTRACE_DRIVER_BOOTSTRAPPING,
     ONIONTRACE_DRIVER_RECORDING,
     ONIONTRACE_DRIVER_PLAYING,
+    ONIONTRACE_DRIVER_LOGGING,
 };
 
 struct _OnionTraceDriver {
@@ -29,6 +30,7 @@ struct _OnionTraceDriver {
     OnionTraceTorCtl* torctl;
     OnionTraceRecorder* recorder;
     OnionTracePlayer* player;
+    OnionTraceLogger* logger;
 };
 
 /* forward declaration */
@@ -42,6 +44,7 @@ const gchar* _oniontracedriver_stateToString(OnionTraceDriverState state) {
         case ONIONTRACE_DRIVER_BOOTSTRAPPING: return "BOOTSTRAPPING";
         case ONIONTRACE_DRIVER_RECORDING: return "RECORDING";
         case ONIONTRACE_DRIVER_PLAYING: return "PLAYING";
+        case ONIONTRACE_DRIVER_LOGGING: return "LOGGING";
         default: return "NONE";
     }
 }
@@ -130,6 +133,8 @@ static void _oniontracedriver_heartbeat(OnionTraceDriver* driver, gpointer unuse
         status = oniontracerecorder_toString(driver->recorder);
     } else if(driver->state == ONIONTRACE_DRIVER_PLAYING && driver->player != NULL) {
         status = oniontraceplayer_toString(driver->player);
+    } else if(driver->state == ONIONTRACE_DRIVER_LOGGING && driver->logger != NULL) {
+        status = oniontracelogger_toString(driver->logger);
     }
 
     if(status) {
@@ -166,7 +171,9 @@ static void _oniontracedriver_onBootstrapped(OnionTraceDriver* driver) {
 
     const gchar* filename = oniontraceconfig_getTraceFileName(driver->config);
 
-    if(oniontraceconfig_getMode(driver->config) == ONIONTRACE_MODE_RECORD) {
+    OnionTraceMode configuredMode = oniontraceconfig_getMode(driver->config);
+
+    if(configuredMode == ONIONTRACE_MODE_RECORD) {
         driver->state = ONIONTRACE_DRIVER_RECORDING;
         driver->recorder = oniontracerecorder_new(driver->torctl, filename);
         if(!driver->recorder) {
@@ -175,7 +182,7 @@ static void _oniontracedriver_onBootstrapped(OnionTraceDriver* driver) {
             oniontraceeventmanager_stopMainLoop(driver->manager);
             return;
         }
-    } else {
+    } else if(configuredMode == ONIONTRACE_MODE_PLAY) {
         driver->state = ONIONTRACE_DRIVER_PLAYING;
 
         driver->player = oniontraceplayer_new(driver->torctl, filename);
@@ -188,6 +195,16 @@ static void _oniontracedriver_onBootstrapped(OnionTraceDriver* driver) {
 
         /* start a timer to start off our circuit building schedule */
         _oniontracedriver_registerPlayTimer(driver);
+    } else {
+        driver->state = ONIONTRACE_DRIVER_LOGGING;
+        const gchar* spaceDelimitedEvents = oniontraceconfig_getSpaceDelimitedEvents(driver->config);
+        driver->logger = oniontracelogger_new(driver->torctl, spaceDelimitedEvents);
+        if(!driver->logger) {
+            critical("%s: Error creating logger instance, cannot proceed", driver->id);
+            driver->state = ONIONTRACE_DRIVER_IDLE;
+            oniontraceeventmanager_stopMainLoop(driver->manager);
+            return;
+        }
     }
 }
 
@@ -275,6 +292,11 @@ gboolean oniontracedriver_stop(OnionTraceDriver* driver) {
         driver->player = NULL;
     }
 
+    if(driver->logger) {
+        oniontracelogger_free(driver->logger);
+        driver->logger = NULL;
+    }
+
     if(driver->heartbeatTimer) {
         oniontracetimer_free(driver->heartbeatTimer);
         driver->heartbeatTimer = NULL;
@@ -319,6 +341,10 @@ void oniontracedriver_free(OnionTraceDriver* driver) {
 
     if(driver->player) {
         oniontraceplayer_free(driver->player);
+    }
+
+    if(driver->logger) {
+        oniontracelogger_free(driver->logger);
     }
 
     if(driver->heartbeatTimer) {
