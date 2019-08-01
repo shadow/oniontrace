@@ -22,7 +22,7 @@ The valid keys and the type of the valid values are listed below, along with
 any defaults. The format is:  
  + `key`:ValueType (default=`val`) [Mode=`ValidMode`] - explanation
 
-Specifying the run mode is **optional**, the default mode is `record`:
+Specifying the run mode is **optional**, the default mode is `log`:
 
  + `Mode`:String (default=`log`) [Mode=`record`,`play`,`log`]  
     Valid values for the running mode are `record`, `play`, and `log`.  
