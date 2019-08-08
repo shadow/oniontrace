@@ -56,7 +56,8 @@ int main(int argc, char *argv[]) {
     gchar hostname[128];
     memset(hostname, 0, 128);
     gethostname(hostname, 128);
-    message("Starting oniontrace on host %s process id %i", hostname, (gint )getpid());
+    message("Starting OnionTrace v%s on host %s process id %i",
+            ONIONTRACE_VERSION, hostname, (gint )getpid());
 
     message("Parsing program arguments");
     OnionTraceConfig* config = oniontraceconfig_new(argc, argv);
