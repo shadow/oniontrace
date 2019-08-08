@@ -242,24 +242,24 @@ class OnionTraceParser(Parser):
             return util.do_dates_match(self.date_filter, date_to_check)
 
     def __parse_line(self, line, do_complete):
-        if self.name is None and re.search("Starting\soniontrace\son\shost", line) is not None:
+        if self.name is None and re.search("Starting\sOnionTrace\sv", line) is not None:
             parts = line.strip().split()
 
-            if len(parts) < 10:
+            if len(parts) < 11:
                 return True
-            '''
-            version_str = parts[8].strip('v')
+
+            version_str = parts[7].strip('v')
             if version_str != __version__:
                 self.version_mismatch = True
                 logging.warning("Version mismatch: the log file we are parsing was generated using \
                 OnionTrace v{}, but this version of OnionTraceTools is v{}".format(version_str, __version__))
                 return True
-            '''
+
             self.start_ts = float(parts[2])
             second = int(round(self.start_ts))
             self.bootstrapping[second] = 0
-            
-            self.name = parts[9]
+
+            self.name = parts[10]
 
         if self.date_filter is not None:
             parts = line.strip().split(' ', 3)
