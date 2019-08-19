@@ -300,7 +300,7 @@ class OnionTraceParser(Parser):
             parts = line.strip().split()
 
             if len(parts) < 10:
-                True
+                return True
 
             second = int(float(parts[2]))
             bwr = int(parts[8])
