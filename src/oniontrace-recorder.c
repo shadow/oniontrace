@@ -96,6 +96,12 @@ static void _oniontracerecorder_onCircuitStatus(OnionTraceRecorder* recorder,
                 oniontracecircuit_setLaunchTime(circuit, &launchTime);
                 oniontracecircuit_setCircuitID(circuit, circuitID);
 
+                if(status == CIRCUIT_STATUS_EXTENDED && path != NULL) {
+                    /* if we got a second path... this will keep the latest one */
+                    info("%s: storing path %s for EXTENDED circuit %i", recorder->id, path, circuitID);
+                    oniontracecircuit_setPath(circuit, g_strdup(path));
+                }
+
                 g_hash_table_replace(recorder->circuits, oniontracecircuit_getID(circuit), circuit);
             }
 
@@ -110,9 +116,9 @@ static void _oniontracerecorder_onCircuitStatus(OnionTraceRecorder* recorder,
             if(path) {
                 OnionTraceCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
 
-                if(circuit) {
+                if(circuit && path) {
                     /* if we got a second path... this will keep the latest one */
-                    info("%s: storing path %s for circuit %i", recorder->id, path, circuitID);
+                    info("%s: storing path %s for BUILT circuit %i", recorder->id, path, circuitID);
                     oniontracecircuit_setPath(circuit, g_strdup(path));
                 }
             }
@@ -125,8 +131,11 @@ static void _oniontracerecorder_onCircuitStatus(OnionTraceRecorder* recorder,
 
             OnionTraceCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
             if(circuit) {
-                /* write the circuit record to disk */
-                oniontracefile_writeCircuit(recorder->otfile, circuit, &recorder->startTime);
+                /* only write the circuit if it was build and we have a path for it */
+                if(oniontracecircuit_getPath(circuit) != NULL) {
+                    /* write the circuit record to disk */
+                    oniontracefile_writeCircuit(recorder->otfile, circuit, &recorder->startTime);
+                }
 
                 /* remove it from our table, which will also free the circuit memory */
                 info("%s: removing and freeing circuit %i", recorder->id, circuitID);
@@ -212,7 +221,8 @@ void oniontracerecorder_free(OnionTraceRecorder* recorder) {
         g_hash_table_iter_init(&iter, recorder->circuits);
         while (g_hash_table_iter_next(&iter, &key, &value)) {
             OnionTraceCircuit* circuit = value;
-            if(circuit) {
+            /* only write the circuit if it was build and we have a path for it */
+            if(circuit && oniontracecircuit_getPath(circuit) != NULL) {
                 oniontracefile_writeCircuit(recorder->otfile, circuit, &recorder->startTime);
             }
         }

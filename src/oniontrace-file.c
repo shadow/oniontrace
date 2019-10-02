@@ -58,34 +58,15 @@ gboolean oniontracefile_writeCircuit(OnionTraceFile* otfile, OnionTraceCircuit* 
         return FALSE;
     }
 
-    /* compute the elapsed time until the circuit should be created */
-    struct timespec startTime;
-    memset(&startTime, 0, sizeof(struct timespec));
-    struct timespec elapsed;
-    memset(&elapsed, 0, sizeof(struct timespec));
+    GString* line = oniontracecircuit_toCSV(circuit, offset);
 
-    if(offset) {
-        startTime = *offset;
+    if(line) {
+        /* write it to the file */
+        fwrite(line->str, 1, line->len, otfile->stream);
+        fflush(otfile->stream);
     }
 
-    oniontracetimer_timespecdiff(&elapsed, &startTime, oniontracecircuit_getLaunchTime(circuit));
-
-    /* get the other circuit elements */
-    const gchar* sessionID = oniontracecircuit_getSessionID(circuit);
-    const gchar* path = oniontracecircuit_getPath(circuit);
-
-    GString* string = g_string_new("");
-
-    /* print using ';'-separated values, because the path already has commas in it */
-    g_string_append_printf(string, "%"G_GSIZE_FORMAT".%09"G_GSIZE_FORMAT";%s;%s\n",
-            (gsize)elapsed.tv_sec, (gsize)elapsed.tv_nsec,
-            sessionID ? sessionID : "NULL", path ? path : "NULL");
-
-    /* write it to the file */
-    fwrite(string->str, 1, string->len, otfile->stream);
-    fflush(otfile->stream);
-
-    g_string_free(string, TRUE);
+    g_string_free(line, TRUE);
 
     return TRUE;
 }
@@ -168,43 +149,18 @@ GQueue* oniontracefile_parseCircuits(OnionTraceFile* otfile) {
 
         info("importing line from trace file: %s", line);
 
-        gchar** parts = g_strsplit(line, ";", 0);
+        /* parse the line into a circuit object */
+        OnionTraceCircuit* circuit = oniontracecircuit_fromCSV(line);
 
-        if(parts[0] && parts[1] && parts[2]) {
-            /* each line represents a circuit */
-            OnionTraceCircuit* circuit = oniontracecircuit_new();
-
-            /* parse the creation time */
-            gchar** times = g_strsplit(parts[0], ".", 0);
-            if(times[0] && times[1]) {
-                struct timespec createTime;
-                createTime.tv_sec = (__time_t)atol(times[0]);
-                createTime.tv_nsec = (__syscall_slong_t)atol(times[1]);
-                oniontracecircuit_setLaunchTime(circuit, &createTime);
-            }
-            g_strfreev(times);
-
-            /* the session id is a string */
-            if(g_ascii_strcasecmp(parts[1], "NULL")) {
-               /* its not equal to NULL, so it must be valid */
-                oniontracecircuit_setSessionID(circuit, g_strdup(parts[1]));
-            }
-
-            /* the path is a string */
-            if(g_ascii_strcasecmp(parts[2], "NULL")) {
-               /* its not equal to NULL, so it must be valid */
-                oniontracecircuit_setPath(circuit, g_strdup(parts[2]));
-            }
-
-            /* store the circuits in chronological order */
+        /* if parsing succeeded, store the circuits in chronological order */
+        if(circuit) {
             g_queue_insert_sorted(circuits, circuit,
                     (GCompareDataFunc)oniontracecircuit_compareLaunchTime, NULL);
         }
 
-        g_strfreev(parts);
-
         g_free(line);
     }
+
     g_queue_free(lines);
 
     return circuits;
