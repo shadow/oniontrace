@@ -25,6 +25,7 @@ struct _OnionTraceDriver {
     gchar* id;
     OnionTraceTimer* heartbeatTimer;
     OnionTraceTimer* shutdownTimer;
+    OnionTraceTimer* cleanupTimer;
     struct timespec nowCached;
 
     OnionTraceTorCtl* torctl;
@@ -83,8 +84,12 @@ static void _oniontracedriver_registerPlayTimer(OnionTraceDriver* driver) {
 
     /* set up a timer so we build the circuit when we should */
     if(hasCircuits) {
+        info("%s: launching next circuit in %"G_GSIZE_FORMAT".%09"G_GSIZE_FORMAT" seconds",
+                driver->id, (gsize)armTime.it_value.tv_sec, (gsize)armTime.it_value.tv_nsec);
+
         OnionTraceTimer* timer = oniontracetimer_new((GFunc)_oniontracedriver_playCallback, driver, NULL);
         oniontracetimer_armGranular(timer, &armTime);
+
         gint timerFD = oniontracetimer_getFD(timer);
         oniontraceeventmanager_register(driver->manager, timerFD, ONIONTRACE_EVENT_READ,
                 (OnionTraceOnEventFunc)_oniontracedriver_playTimerReadable, timer);
@@ -115,6 +120,23 @@ static void _oniontracedriver_registerShutdown(OnionTraceDriver* driver, guint s
     gint timerFD = oniontracetimer_getFD(driver->shutdownTimer);
     oniontraceeventmanager_register(driver->manager, timerFD, ONIONTRACE_EVENT_READ,
             (OnionTraceOnEventFunc)_oniontracedriver_genericTimerReadable, driver->shutdownTimer);
+}
+
+static void _oniontracedriver_cleanup(OnionTraceDriver* driver, gpointer unused) {
+    g_assert(driver);
+
+    if(driver->state == ONIONTRACE_DRIVER_RECORDING && driver->recorder != NULL) {
+        oniontracerecorder_cleanup(driver->recorder);
+    }
+}
+
+static void _oniontracedriver_registerCleanup(OnionTraceDriver* driver, guint seconds) {
+    driver->cleanupTimer = oniontracetimer_new((GFunc)_oniontracedriver_cleanup, driver, NULL);
+    oniontracetimer_arm(driver->cleanupTimer, seconds, 0);
+
+    gint timerFD = oniontracetimer_getFD(driver->cleanupTimer);
+    oniontraceeventmanager_register(driver->manager, timerFD, ONIONTRACE_EVENT_READ,
+            (OnionTraceOnEventFunc)_oniontracedriver_genericTimerReadable, driver->cleanupTimer);
 }
 
 static void _oniontracedriver_heartbeat(OnionTraceDriver* driver, gpointer unused) {
@@ -267,6 +289,7 @@ gboolean oniontracedriver_start(OnionTraceDriver* driver) {
 
     gint runTimeSeconds = oniontraceconfig_getRunTimeSeconds(driver->config);
     if(runTimeSeconds > 0) {
+        _oniontracedriver_registerCleanup(driver, runTimeSeconds-1);
         _oniontracedriver_registerShutdown(driver, runTimeSeconds);
     }
 

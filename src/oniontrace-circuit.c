@@ -28,23 +28,39 @@ void oniontracecircuit_free(OnionTraceCircuit* circuit) {
     g_free(circuit);
 }
 
-OnionTraceCircuit* oniontracecircuit_fromCSV(const gchar* line) {
+OnionTraceCircuit* oniontracecircuit_copy(OnionTraceCircuit* circuit) {
+    OnionTraceCircuit* copy = oniontracecircuit_new();
+    copy->launchTime = circuit->launchTime;
+    copy->circuitID = circuit->circuitID;
+    copy->path = circuit->path ? g_strdup(circuit->path) : NULL;
+    copy->sessionID = circuit->sessionID ? g_strdup(circuit->sessionID) : NULL;
+    copy->numStreams = circuit->numStreams;
+    return copy;
+}
+
+OnionTraceCircuit* oniontracecircuit_fromCSV(const gchar* line, struct timespec* offset) {
     OnionTraceCircuit* circuit = NULL;
 
-    if(line) {
+    if(line && offset) {
         gchar** parts = g_strsplit(line, ";", 0);
 
         if(parts[0] && parts[1] && parts[2]) {
             /* each line represents a circuit */
-            OnionTraceCircuit* circuit = oniontracecircuit_new();
+            circuit = oniontracecircuit_new();
 
             /* parse the creation time */
             gchar** times = g_strsplit(parts[0], ".", 0);
             if(times[0] && times[1]) {
-                struct timespec createTime;
-                createTime.tv_sec = (__time_t)atol(times[0]);
-                createTime.tv_nsec = (__syscall_slong_t)atol(times[1]);
-                oniontracecircuit_setLaunchTime(circuit, &createTime);
+                struct timespec createTimeRel;
+                memset(&createTimeRel, 0, sizeof(struct timespec));
+                createTimeRel.tv_sec = (__time_t)atol(times[0]);
+                createTimeRel.tv_nsec = (__syscall_slong_t)atol(times[1]);
+
+                struct timespec createTimeAbs;
+                memset(&createTimeAbs, 0, sizeof(struct timespec));
+                oniontracetimer_timespecadd(&createTimeAbs, offset, &createTimeRel);
+
+                oniontracecircuit_setLaunchTime(circuit, &createTimeAbs);
             }
             g_strfreev(times);
 
@@ -79,7 +95,7 @@ GString* oniontracecircuit_toCSV(OnionTraceCircuit* circuit, struct timespec* of
         startTime = *offset;
     }
 
-    oniontracetimer_timespecdiff(&elapsed, &startTime, oniontracecircuit_getLaunchTime(circuit));
+    oniontracetimer_timespecsubtract(&elapsed, &startTime, oniontracecircuit_getLaunchTime(circuit));
 
     /* get the other circuit elements */
     const gchar* sessionID = oniontracecircuit_getSessionID(circuit);

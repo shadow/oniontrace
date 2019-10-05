@@ -25,6 +25,12 @@ struct _OnionTraceTorCtl {
     gboolean currentlyReceivingDescriptors;
     GQueue* descriptorLines;
 
+    /* flags used for parsing circuits */
+    gboolean circuitStatusCleanup;
+    gboolean waitingCircuitStatusResponse;
+    gboolean currentlyReceivingCircuitStatuses;
+    GQueue* circuitStatusLines;
+
     GString* receiveLineBuffer;
 
     OnConnectedFunc onConnected;
@@ -115,6 +121,86 @@ static void _oniontracetorctl_processDescriptorLine(OnionTraceTorCtl* torctl, GS
     }
 }
 
+static void _oniontracetorctl_handleCircuitStatuses(OnionTraceTorCtl* torctl) {
+    if(!torctl || !torctl->circuitStatusLines) {
+        return;
+    }
+
+    /* if there is no callback set, we will take no action so no need to parse anything */
+    if(!torctl->onCircuitStatus) {
+        return;
+    }
+
+    while(g_queue_get_length(torctl->circuitStatusLines) > 0) {
+        gchar* line = g_queue_pop_head(torctl->circuitStatusLines);
+        info("GETINFO circuit-status result: %s", line);
+
+        gint circuitID = 0;
+        gchar* path = NULL;
+
+        gchar** parts = g_strsplit(line, " ", 0);
+        if(parts[0] != NULL) {
+            circuitID = atoi(parts[0]);
+        }
+        if(parts[2] != NULL) {
+            path = g_strdup(parts[2]);
+        }
+        g_strfreev(parts);
+
+        if(torctl->circuitStatusCleanup) {
+            /* simulate a close event so recorder can clean up circuit */
+            torctl->onCircuitStatus(torctl->onCircuitStatusArg, CIRCUIT_STATUS_CLOSED, circuitID, path);
+        } else {
+            /* simulate a create event so recorder can log circuit */
+            torctl->onCircuitStatus(torctl->onCircuitStatusArg, CIRCUIT_STATUS_ASSIGNED, circuitID, NULL);
+            torctl->onCircuitStatus(torctl->onCircuitStatusArg, CIRCUIT_STATUS_BUILT, circuitID, path);
+        }
+
+        if(path != NULL) {
+            g_free(path);
+        }
+    }
+}
+
+static void _oniontracetorctl_processCircuitStatusLine(OnionTraceTorCtl* torctl, GString* linebuf) {
+    /* handle descriptor info */
+    if(!torctl->circuitStatusLines &&
+            !g_ascii_strncasecmp(linebuf->str, "250+circuit-status=", MIN(linebuf->len, 19))) {
+        info("%s: 'GETINFO circuit-status\\r\\n' command successful, circuit-status coming next", torctl->id);
+        torctl->circuitStatusLines = g_queue_new();
+    }
+
+    if(torctl->circuitStatusLines) {
+        /* circuits coming */
+        if(!g_ascii_strncasecmp(linebuf->str, "250+circuit-status=", MIN(linebuf->len, 19))) {
+            /* header */
+            debug("%s: got circuit-status response header '%s'", torctl->id, linebuf->str);
+            torctl->currentlyReceivingCircuitStatuses = TRUE;
+            torctl->waitingCircuitStatusResponse = FALSE;
+        } else if(linebuf->str[0] == '.') {
+            /* footer */
+            debug("%s: got circuit-status response footer '%s'", torctl->id, linebuf->str);
+        } else if(!g_ascii_strncasecmp(linebuf->str, "250 OK", MIN(linebuf->len, 6))) {
+            /* all done with descriptors */
+            info("%s: finished getting circuit-status with success code '%s'", torctl->id, linebuf->str);
+
+            torctl->currentlyReceivingCircuitStatuses = FALSE;
+
+            _oniontracetorctl_handleCircuitStatuses(torctl);
+
+            /* clean up any leftover lines */
+            while(g_queue_get_length(torctl->circuitStatusLines) > 0) {
+                g_free(g_queue_pop_head(torctl->circuitStatusLines));
+            }
+            g_queue_free(torctl->circuitStatusLines);
+            torctl->circuitStatusLines = NULL;
+        } else {
+            /* real descriptor lines */
+            g_queue_push_tail(torctl->circuitStatusLines, g_strdup(linebuf->str));
+        }
+    }
+}
+
 static in_port_t _oniontracetorctl_scanSourcePort(gchar** parts) {
     in_port_t sourcePort = 0;
     for(gint i = 0; parts != NULL && parts[i] != NULL; i++) {
@@ -198,6 +284,9 @@ static void _oniontracetorctl_processLineHelper(OnionTraceTorCtl* torctl, GStrin
     if(torctl->currentlyReceivingDescriptors) {
         _oniontracetorctl_processDescriptorLine(torctl, linebuf);
         return;
+    } else if(torctl->currentlyReceivingCircuitStatuses) {
+        _oniontracetorctl_processCircuitStatusLine(torctl, linebuf);
+        return;
     }
 
     gint code = _oniontracetorctl_parseCode(linebuf->str);
@@ -206,6 +295,9 @@ static void _oniontracetorctl_processLineHelper(OnionTraceTorCtl* torctl, GStrin
         if(torctl->waitingGetDescriptorsResponse &&
                 !g_ascii_strncasecmp(linebuf->str, "250+ns/all=", MIN(linebuf->len, 11))) {
             _oniontracetorctl_processDescriptorLine(torctl, linebuf);
+        } else if(torctl->waitingCircuitStatusResponse &&
+                !g_ascii_strncasecmp(linebuf->str, "250+circuit-status=", MIN(linebuf->len, 19))) {
+            _oniontracetorctl_processCircuitStatusLine(torctl, linebuf);
         } else if(!g_ascii_strncasecmp(linebuf->str, "250 EXTENDED ", MIN(linebuf->len, 13))) {
             gchar** parts = g_strsplit(linebuf->str, " ", 0);
 
@@ -703,4 +795,16 @@ void oniontracetorctl_commandCloseStream(OnionTraceTorCtl* torctl, gint streamID
     g_assert(torctl);
     // "CLOSESTREAM" SP StreamID SP Reason *(SP Flag) CRLF
     _oniontracetorctl_commandHelper(torctl, "CLOSESTREAM %i REASON_MISC\r\n", streamID);
+}
+
+void oniontracetorctl_commandGetAllCircuitStatus(OnionTraceTorCtl* torctl) {
+    g_assert(torctl);
+    torctl->waitingCircuitStatusResponse = TRUE;
+    _oniontracetorctl_commandHelper(torctl, "GETINFO circuit-status\r\n");
+}
+
+void oniontracetorctl_commandGetAllCircuitStatusCleanup(OnionTraceTorCtl* torctl) {
+    g_assert(torctl);
+    torctl->circuitStatusCleanup = TRUE;
+    oniontracetorctl_commandGetAllCircuitStatus(torctl);
 }

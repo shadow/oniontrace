@@ -11,9 +11,10 @@
 typedef struct _OnionTraceCircuit OnionTraceCircuit;
 
 OnionTraceCircuit* oniontracecircuit_new();
+OnionTraceCircuit* oniontracecircuit_copy(OnionTraceCircuit* circuit);
 void oniontracecircuit_free(OnionTraceCircuit* circuit);
 
-OnionTraceCircuit* oniontracecircuit_fromCSV(const gchar* line);
+OnionTraceCircuit* oniontracecircuit_fromCSV(const gchar* line, struct timespec* offset);
 GString* oniontracecircuit_toCSV(OnionTraceCircuit* circuit, struct timespec* offset);
 
 gint* oniontracecircuit_getID(OnionTraceCircuit* circuit);

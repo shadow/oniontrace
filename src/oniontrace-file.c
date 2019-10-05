@@ -119,7 +119,7 @@ static GQueue* _oniontracefile_getLines(OnionTraceFile* otfile) {
 }
 
 /* returns a queue of OnionTraceCircuit* objects sorted by launch time */
-GQueue* oniontracefile_parseCircuits(OnionTraceFile* otfile) {
+GQueue* oniontracefile_parseCircuits(OnionTraceFile* otfile, struct timespec* offset) {
     g_assert(otfile);
 
     if(otfile->mode != ONIONTRACE_FILE_READ) {
@@ -150,7 +150,7 @@ GQueue* oniontracefile_parseCircuits(OnionTraceFile* otfile) {
         info("importing line from trace file: %s", line);
 
         /* parse the line into a circuit object */
-        OnionTraceCircuit* circuit = oniontracecircuit_fromCSV(line);
+        OnionTraceCircuit* circuit = oniontracecircuit_fromCSV(line, offset);
 
         /* if parsing succeeded, store the circuits in chronological order */
         if(circuit) {

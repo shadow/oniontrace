@@ -15,6 +15,6 @@ OnionTraceFile* oniontracefile_newReader(const gchar* filename);
 void oniontracefile_free(OnionTraceFile* otfile);
 
 gboolean oniontracefile_writeCircuit(OnionTraceFile* otfile, OnionTraceCircuit* circuit, struct timespec* offset);
-GQueue* oniontracefile_parseCircuits(OnionTraceFile* otfile);
+GQueue* oniontracefile_parseCircuits(OnionTraceFile* otfile, struct timespec* offset);
 
 #endif /* SRC_ONIONTRACE_FILE_H_ */

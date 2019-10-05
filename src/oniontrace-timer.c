@@ -105,29 +105,44 @@ void oniontracetimer_free(OnionTraceTimer* timer) {
 }
 
 /* adapted from the libc manual for diffing timevals to be compat with timespec
- *
- * Subtract the ‘struct timespec’ values X and Y,
- * storing the result in RESULT.
- * Return 1 if the difference is negative, otherwise 0. */
-int oniontracetimer_timespecdiff(struct timespec *result,
-        struct timespec *start, struct timespec *stop) {
+ * Subtract a from b, i.e., returns b - a in result */
+void oniontracetimer_timespecsubtract(struct timespec *result,
+        struct timespec *a, struct timespec *b) {
+
+    struct timespec minuend;
+    memset(&minuend, 0, sizeof(struct timespec));
+    minuend = *b;
+
+    struct timespec subtrahend;
+    memset(&subtrahend, 0, sizeof(struct timespec));
+    subtrahend = *a;
+
     /* Perform the carry for the later subtraction by updating start. */
-    if (stop->tv_nsec < start->tv_nsec) {
-        long nsec = (start->tv_nsec - stop->tv_nsec) / 1000000000 + 1;
-        start->tv_nsec -= 1000000000 * nsec;
-        start->tv_sec += nsec;
+    if (minuend.tv_nsec < subtrahend.tv_nsec) {
+        long num_secs = (subtrahend.tv_nsec - minuend.tv_nsec) / 1000000000 + 1;
+        subtrahend.tv_nsec -= 1000000000 * num_secs;
+        subtrahend.tv_sec += num_secs;
     }
-    if (stop->tv_nsec - start->tv_nsec > 1000000000) {
-        long nsec = (stop->tv_nsec - start->tv_nsec) / 1000000000;
-        start->tv_nsec += 1000000000 * nsec;
-        start->tv_sec -= nsec;
+    if (minuend.tv_nsec - subtrahend.tv_nsec > 1000000000) {
+        long num_secs = (minuend.tv_nsec - subtrahend.tv_nsec) / 1000000000;
+        subtrahend.tv_nsec += 1000000000 * num_secs;
+        subtrahend.tv_sec -= num_secs;
     }
 
-    /* Compute the time remaining to wait.
-     tv_nsec is certainly positive. */
-    result->tv_sec = stop->tv_sec - start->tv_sec;
-    result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+    /* Compute the time remaining to wait. tv_nsec is certainly positive. */
+    result->tv_sec = minuend.tv_sec - subtrahend.tv_sec;
+    result->tv_nsec = minuend.tv_nsec - subtrahend.tv_nsec;
+}
 
-    /* Return 1 if result is negative. */
-    return stop->tv_sec < start->tv_sec;
+void oniontracetimer_timespecadd(struct timespec *result,
+        struct timespec *a, struct timespec *b) {
+    result->tv_sec = a->tv_sec + b->tv_sec;
+
+    long nsec = a->tv_nsec + b->tv_nsec;
+    while(nsec >= 1000000000) {
+        result->tv_sec += 1;
+        nsec -= 1000000000;
+    }
+
+    result->tv_nsec = nsec;
 }

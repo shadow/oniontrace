@@ -76,4 +76,7 @@ void oniontracetorctl_commandAttachStreamToCircuit(OnionTraceTorCtl* torctl, gin
 void oniontracetorctl_commandCloseCircuit(OnionTraceTorCtl* torctl, gint crcuitID);
 void oniontracetorctl_commandCloseStream(OnionTraceTorCtl* torctl, gint streamID);
 
+void oniontracetorctl_commandGetAllCircuitStatus(OnionTraceTorCtl* torctl);
+void oniontracetorctl_commandGetAllCircuitStatusCleanup(OnionTraceTorCtl* torctl);
+
 #endif /* SRC_ONIONTRACE_TORCTL_H_ */

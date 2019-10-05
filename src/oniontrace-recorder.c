@@ -26,13 +26,16 @@ static void _oniontracerecorder_onStreamStatus(OnionTraceRecorder* recorder,
 
     switch(status) {
         case STREAM_STATUS_SUCCEEDED: {
-            info("%s: stream %i SUCCEEDED on circuit %i with username %s",
-                    recorder->id, streamID, circuitID, username);
+            info("%s: stream SUCCEEDED for session name %s: stream %i on circuit %i",
+                    recorder->id, username, streamID, circuitID);
             recorder->streamCountTotal++;
 
             OnionTraceCircuit* circuit = g_hash_table_lookup(recorder->circuits, &circuitID);
 
             if(circuit) {
+                info("%s: circuit %i for session name %s will be recorded",
+                    recorder->id, circuitID, username);
+
                 oniontracecircuit_incrementStreamCounter(circuit);
 
                 if(username) {
@@ -41,7 +44,7 @@ static void _oniontracerecorder_onStreamStatus(OnionTraceRecorder* recorder,
                     /* store the username as the session ID for this circuit.
                      * if we got a second username, make sure they match */
                     if(!sessionID) {
-                        info("%s: storing username %s as session ID for circuit %i",
+                        info("%s: storing username %s as the session name for circuit %i",
                                 recorder->id, username, circuitID);
                         oniontracecircuit_setSessionID(circuit, g_strdup(username));
                     } else {
@@ -52,6 +55,14 @@ static void _oniontracerecorder_onStreamStatus(OnionTraceRecorder* recorder,
                         }
                     }
                 }
+            } else {
+                info("%s: circuit %i for session name %s is not recorded. closing now so we get "
+                        "a new circuit for the session and then we can record it",
+                        recorder->id, circuitID, username);
+
+                /* a stream was built on a circuit we did not record. close the circuit
+                 * so that Tor will use a new one that we will record. */
+                oniontracetorctl_commandCloseCircuit(recorder->torctl, circuitID);
             }
 
             break;
@@ -154,6 +165,10 @@ static void _oniontracerecorder_onCircuitStatus(OnionTraceRecorder* recorder,
     }
 }
 
+void oniontracerecorder_cleanup(OnionTraceRecorder* recorder) {
+    oniontracetorctl_commandGetAllCircuitStatusCleanup(recorder->torctl);
+}
+
 /* returns a status string for the heartbeat message */
 gchar* oniontracerecorder_toString(OnionTraceRecorder* recorder) {
     guint circuitCountActive = 0, streamCountActive = 0;
@@ -206,6 +221,11 @@ OnionTraceRecorder* oniontracerecorder_new(OnionTraceTorCtl* torctl, const gchar
 
     /* start watching for circuit and stream events */
     oniontracetorctl_commandEnableEvents(recorder->torctl, "CIRC STREAM");
+
+    /* record all existing circuits.
+     * this will call our circuit status callback for all existing circuits
+     * that were built before we started listening. */
+    oniontracetorctl_commandGetAllCircuitStatus(recorder->torctl);
 
     return recorder;
 }
