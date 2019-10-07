@@ -10,6 +10,9 @@ struct _OnionTraceCircuit {
     gchar* path;
     gchar* sessionID;
     guint numStreams;
+
+    CircuitStatus status;
+    GQueue* waitingStreamIDs;
 };
 
 OnionTraceCircuit* oniontracecircuit_new() {
@@ -25,17 +28,10 @@ void oniontracecircuit_free(OnionTraceCircuit* circuit) {
     if(circuit->sessionID) {
         g_free(circuit->sessionID);
     }
+    if(circuit->waitingStreamIDs) {
+        g_queue_free(circuit->waitingStreamIDs);
+    }
     g_free(circuit);
-}
-
-OnionTraceCircuit* oniontracecircuit_copy(OnionTraceCircuit* circuit) {
-    OnionTraceCircuit* copy = oniontracecircuit_new();
-    copy->launchTime = circuit->launchTime;
-    copy->circuitID = circuit->circuitID;
-    copy->path = circuit->path ? g_strdup(circuit->path) : NULL;
-    copy->sessionID = circuit->sessionID ? g_strdup(circuit->sessionID) : NULL;
-    copy->numStreams = circuit->numStreams;
-    return copy;
 }
 
 OnionTraceCircuit* oniontracecircuit_fromCSV(const gchar* line, struct timespec* offset) {
@@ -138,6 +134,16 @@ gint oniontracecircuit_getCircuitID(OnionTraceCircuit* circuit) {
     return circuit->circuitID;
 }
 
+void oniontracecircuit_setCircuitStatus(OnionTraceCircuit* circuit, CircuitStatus status) {
+    g_assert(circuit);
+    circuit->status = status;
+}
+
+CircuitStatus oniontracecircuit_getCircuitStatus(OnionTraceCircuit* circuit) {
+    g_assert(circuit);
+    return circuit->status;
+}
+
 void oniontracecircuit_setSessionID(OnionTraceCircuit* circuit, gchar* sessionID) {
     g_assert(circuit);
     if(circuit->sessionID) {
@@ -193,4 +199,17 @@ gint oniontracecircuit_compareLaunchTime(const OnionTraceCircuit* a, const Onion
             return 0;
         }
     }
+}
+
+void oniontracecircuit_addWaitingStreamID(OnionTraceCircuit* circuit, gint streamID) {
+    g_assert(circuit);
+    if(!circuit->waitingStreamIDs) {
+        circuit->waitingStreamIDs = g_queue_new();
+    }
+    g_queue_push_tail(circuit->waitingStreamIDs, GINT_TO_POINTER(streamID));
+}
+
+GQueue* oniontracecircuit_getWaitingStreamIDs(OnionTraceCircuit* circuit) {
+    g_assert(circuit);
+    return circuit->waitingStreamIDs;
 }

@@ -11,7 +11,6 @@
 typedef struct _OnionTraceCircuit OnionTraceCircuit;
 
 OnionTraceCircuit* oniontracecircuit_new();
-OnionTraceCircuit* oniontracecircuit_copy(OnionTraceCircuit* circuit);
 void oniontracecircuit_free(OnionTraceCircuit* circuit);
 
 OnionTraceCircuit* oniontracecircuit_fromCSV(const gchar* line, struct timespec* offset);
@@ -28,6 +27,9 @@ gint oniontracecircuit_getCircuitID(OnionTraceCircuit* circuit);
 void oniontracecircuit_setSessionID(OnionTraceCircuit* circuit, gchar* sessionID);
 const gchar* oniontracecircuit_getSessionID(OnionTraceCircuit* circuit);
 
+void oniontracecircuit_setCircuitStatus(OnionTraceCircuit* circuit, CircuitStatus status);
+CircuitStatus oniontracecircuit_getCircuitStatus(OnionTraceCircuit* circuit);
+
 void oniontracecircuit_setPath(OnionTraceCircuit* circuit, gchar* path);
 const gchar* oniontracecircuit_getPath(OnionTraceCircuit* circuit);
 
@@ -36,5 +38,8 @@ guint oniontracecircuit_getStreamCounter(OnionTraceCircuit* circuit);
 
 gint oniontracecircuit_compareLaunchTime(const OnionTraceCircuit* a, const OnionTraceCircuit* b,
         gpointer unused);
+
+void oniontracecircuit_addWaitingStreamID(OnionTraceCircuit* circuit, gint streamID);
+GQueue* oniontracecircuit_getWaitingStreamIDs(OnionTraceCircuit* circuit);
 
 #endif /* SRC_ONIONTRACE_CIRCUIT_H_ */
