@@ -39,7 +39,4 @@ guint oniontracecircuit_getStreamCounter(OnionTraceCircuit* circuit);
 gint oniontracecircuit_compareLaunchTime(const OnionTraceCircuit* a, const OnionTraceCircuit* b,
         gpointer unused);
 
-void oniontracecircuit_addWaitingStreamID(OnionTraceCircuit* circuit, gint streamID);
-GQueue* oniontracecircuit_getWaitingStreamIDs(OnionTraceCircuit* circuit);
-
 #endif /* SRC_ONIONTRACE_CIRCUIT_H_ */

@@ -12,7 +12,6 @@ struct _OnionTraceCircuit {
     guint numStreams;
 
     CircuitStatus status;
-    GQueue* waitingStreamIDs;
 };
 
 OnionTraceCircuit* oniontracecircuit_new() {
@@ -27,9 +26,6 @@ void oniontracecircuit_free(OnionTraceCircuit* circuit) {
     }
     if(circuit->sessionID) {
         g_free(circuit->sessionID);
-    }
-    if(circuit->waitingStreamIDs) {
-        g_queue_free(circuit->waitingStreamIDs);
     }
     g_free(circuit);
 }
@@ -199,17 +195,4 @@ gint oniontracecircuit_compareLaunchTime(const OnionTraceCircuit* a, const Onion
             return 0;
         }
     }
-}
-
-void oniontracecircuit_addWaitingStreamID(OnionTraceCircuit* circuit, gint streamID) {
-    g_assert(circuit);
-    if(!circuit->waitingStreamIDs) {
-        circuit->waitingStreamIDs = g_queue_new();
-    }
-    g_queue_push_tail(circuit->waitingStreamIDs, GINT_TO_POINTER(streamID));
-}
-
-GQueue* oniontracecircuit_getWaitingStreamIDs(OnionTraceCircuit* circuit) {
-    g_assert(circuit);
-    return circuit->waitingStreamIDs;
 }
