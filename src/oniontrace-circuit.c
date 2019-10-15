@@ -10,6 +10,7 @@ struct _OnionTraceCircuit {
     gchar* path;
     gchar* sessionID;
     guint numStreams;
+    guint numFailures;
 
     CircuitStatus status;
 };
@@ -174,6 +175,16 @@ void oniontracecircuit_incrementStreamCounter(OnionTraceCircuit* circuit) {
 guint oniontracecircuit_getStreamCounter(OnionTraceCircuit* circuit) {
     g_assert(circuit);
     return circuit->numStreams;
+}
+
+void oniontracecircuit_incrementFailureCounter(OnionTraceCircuit* circuit) {
+    g_assert(circuit);
+    circuit->numFailures++;
+}
+
+guint oniontracecircuit_getFailureCounter(OnionTraceCircuit* circuit) {
+    g_assert(circuit);
+    return circuit->numFailures;
 }
 
 gint oniontracecircuit_compareLaunchTime(const OnionTraceCircuit* a, const OnionTraceCircuit* b,

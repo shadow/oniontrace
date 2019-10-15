@@ -101,17 +101,24 @@ static void _oniontraceplayer_handleSession(OnionTracePlayer* player, Session* s
             g_queue_push_tail(player->sessionAssignmentBacklog, session);
         } else {
             /* launch new circuit */
-            const gchar* path = oniontracecircuit_getPath(circuit);
-            oniontracetorctl_commandBuildNewCircuit(player->torctl, path);
+            if(oniontracecircuit_getFailureCounter(circuit) >= 3) {
+                oniontracetorctl_commandBuildNewCircuit(player->torctl, NULL);
+
+                message("%s: launched new circuit on session %s without path "
+                        "(original path failed too many times)",
+                        player->id, session->id);
+            } else {
+                const gchar* path = oniontracecircuit_getPath(circuit);
+                oniontracetorctl_commandBuildNewCircuit(player->torctl, path);
+
+                message("%s: launched new circuit on session %s with path %s",
+                        player->id, session->id, path);
+            }
             player->counts.circuitsBuilding++;
             player->sessionAwaitingAssignment = session;
 
             /* update circuit status */
             oniontracecircuit_setCircuitStatus(circuit, CIRCUIT_STATUS_LAUNCHED);
-
-            /* log status */
-            message("%s: launched new circuit on session %s with path %s",
-                    player->id, session->id, path);
         }
     } else if(status == CIRCUIT_STATUS_LAUNCHED) {
         info("%s: waiting for circuit id assignment for session %s",
@@ -293,6 +300,7 @@ static void _oniontraceplayer_onCircuitStatus(OnionTracePlayer* player,
             if(circuit) {
                 if(status == CIRCUIT_STATUS_FAILED) {
                     player->counts.circuitsFailed++;
+                    oniontracecircuit_incrementFailureCounter(circuit);
                 }
                 g_hash_table_remove(player->circuits, &circuitID);
 

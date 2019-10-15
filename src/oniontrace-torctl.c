@@ -776,8 +776,11 @@ void oniontracetorctl_commandGetDescriptorInfo(OnionTraceTorCtl* torctl,
 
 void oniontracetorctl_commandBuildNewCircuit(OnionTraceTorCtl* torctl, const gchar* path) {
     g_assert(torctl);
-    g_assert(path);
-    _oniontracetorctl_commandHelper(torctl, "EXTENDCIRCUIT 0 %s\r\n", path);
+    if(path) {
+        _oniontracetorctl_commandHelper(torctl, "EXTENDCIRCUIT 0 %s\r\n", path);
+    } else {
+        _oniontracetorctl_commandHelper(torctl, "EXTENDCIRCUIT 0\r\n");
+    }
 }
 
 void oniontracetorctl_commandAttachStreamToCircuit(OnionTraceTorCtl* torctl, gint streamID, gint circuitID) {

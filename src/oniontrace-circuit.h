@@ -36,6 +36,9 @@ const gchar* oniontracecircuit_getPath(OnionTraceCircuit* circuit);
 void oniontracecircuit_incrementStreamCounter(OnionTraceCircuit* circuit);
 guint oniontracecircuit_getStreamCounter(OnionTraceCircuit* circuit);
 
+void oniontracecircuit_incrementFailureCounter(OnionTraceCircuit* circuit);
+guint oniontracecircuit_getFailureCounter(OnionTraceCircuit* circuit);
+
 gint oniontracecircuit_compareLaunchTime(const OnionTraceCircuit* a, const OnionTraceCircuit* b,
         gpointer unused);
 
