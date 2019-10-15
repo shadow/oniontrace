@@ -4,11 +4,16 @@
 
 #include "oniontrace.h"
 
-typedef struct _PlayerSession {
+typedef struct _Session {
     gchar* id;
     GQueue* circuitsSorted;
     GQueue* waitingStreamIDs;
-} PlayerSession;
+} Session;
+
+typedef struct _LaunchInfo {
+    struct timespec abstime;
+    Session* session;
+} LaunchInfo;
 
 struct _OnionTracePlayer {
     /* objects we don't own */
@@ -21,7 +26,9 @@ struct _OnionTracePlayer {
     GHashTable* sessions;
     GHashTable* circuits;
 
-    PlayerSession* sessionAwaitingAssignment;
+    GQueue* launches;
+
+    Session* sessionAwaitingAssignment;
     GQueue* sessionAssignmentBacklog;
 
     struct {
@@ -36,7 +43,7 @@ struct _OnionTracePlayer {
     } counts;
 };
 
-static OnionTraceCircuit* _oniontraceplayer_getCurrentCircuit(OnionTracePlayer* player, PlayerSession* session) {
+static OnionTraceCircuit* _oniontraceplayer_getCurrentCircuit(OnionTracePlayer* player, Session* session) {
     g_assert(player);
     g_assert(session);
 
@@ -77,7 +84,7 @@ static OnionTraceCircuit* _oniontraceplayer_getCurrentCircuit(OnionTracePlayer* 
     }
 }
 
-static void _oniontraceplayer_handleSession(OnionTracePlayer* player, PlayerSession* session) {
+static void _oniontraceplayer_handleSession(OnionTracePlayer* player, Session* session) {
     g_assert(player);
     g_assert(session);
 
@@ -117,12 +124,18 @@ static void _oniontraceplayer_handleSession(OnionTracePlayer* player, PlayerSess
     } else if(status == CIRCUIT_STATUS_BUILT) {
         while(!g_queue_is_empty(session->waitingStreamIDs)) {
             gint streamID = GPOINTER_TO_INT(g_queue_pop_head(session->waitingStreamIDs));
-            oniontracetorctl_commandAttachStreamToCircuit(player->torctl, streamID, circuitID);
 
-            info("%s: assigned stream %i to circuit %i for session %s",
-                    player->id, streamID, circuitID, session->id);
-            player->counts.streamsAssigning--;
-            player->counts.streamsAssigned++;
+            if(streamID >= 0) {
+                oniontracetorctl_commandAttachStreamToCircuit(player->torctl, streamID, circuitID);
+
+                info("%s: assigned stream %i to circuit %i for session %s",
+                        player->id, streamID, circuitID, session->id);
+                player->counts.streamsAssigning--;
+                player->counts.streamsAssigned++;
+            } else {
+                info("%s: preemptively built circuit %i for session %s",
+                        player->id, circuitID, session->id);
+            }
         }
     } else {
         gint circuitID = oniontracecircuit_getCircuitID(circuit);
@@ -134,7 +147,7 @@ static void _oniontraceplayer_handleSessionBacklog(OnionTracePlayer* player) {
     g_assert(player);
 
     while(!player->sessionAwaitingAssignment && !g_queue_is_empty(player->sessionAssignmentBacklog)) {
-        PlayerSession* session = g_queue_pop_head(player->sessionAssignmentBacklog);
+        Session* session = g_queue_pop_head(player->sessionAssignmentBacklog);
         _oniontraceplayer_handleSession(player, session);
     }
 }
@@ -146,7 +159,7 @@ static void _oniontraceplayer_onStreamStatus(OnionTracePlayer* player,
     /* note: the sourcePort is only valid for STREAM_STATUS_NEW, otherwise its 0 */
 
     /* do the session lookup */
-    PlayerSession* session = NULL;
+    Session* session = NULL;
     if(username) {
         session = g_hash_table_lookup(player->sessions, username);
     }
@@ -228,7 +241,7 @@ static void _oniontraceplayer_onCircuitStatus(OnionTracePlayer* player,
             /* if we build a custom circuit, Tor will assign your path a
              * circuit id and emit this status event to tell us the circuit id */
             if(player->sessionAwaitingAssignment) {
-                PlayerSession* session = player->sessionAwaitingAssignment;
+                Session* session = player->sessionAwaitingAssignment;
                 OnionTraceCircuit* circuit = g_queue_peek_head(session->circuitsSorted);
 
                 /* we now save the circuit id */
@@ -258,7 +271,7 @@ static void _oniontraceplayer_onCircuitStatus(OnionTracePlayer* player,
 
                 /* now that its built, we can assign any waiting streams to it */
                 const gchar* sessionID = oniontracecircuit_getSessionID(circuit);
-                PlayerSession* session = g_hash_table_lookup(player->sessions, sessionID);
+                Session* session = g_hash_table_lookup(player->sessions, sessionID);
 
                 if(session) {
                     message("%s: circuit %i is built for session %s and path %s",
@@ -284,7 +297,7 @@ static void _oniontraceplayer_onCircuitStatus(OnionTracePlayer* player,
                 g_hash_table_remove(player->circuits, &circuitID);
 
                 const gchar* sessionID = oniontracecircuit_getSessionID(circuit);
-                PlayerSession* session = g_hash_table_lookup(player->sessions, sessionID);
+                Session* session = g_hash_table_lookup(player->sessions, sessionID);
 
                 if(session) {
                     /* reset the circuit */
@@ -317,6 +330,54 @@ static void _oniontraceplayer_onCircuitStatus(OnionTracePlayer* player,
     }
 }
 
+/* gets the elapsed time from now until we should build another circuit.
+ * returns the relative time, which is 0 if we have no more circuits to build. */
+struct timespec oniontraceplayer_launchNextCircuit(OnionTracePlayer* player) {
+    g_assert(player);
+
+    struct timespec nextLaunchTime;
+    memset(&nextLaunchTime, 0, sizeof(struct timespec));
+
+    LaunchInfo* launch = g_queue_peek_head(player->launches);
+    if(!launch) {
+        /* return 0 to stop trying to launch more */
+        return nextLaunchTime;
+    }
+
+    /* what time is it now */
+    struct timespec now;
+    memset(&now, 0, sizeof(struct timespec));
+    clock_gettime(CLOCK_REALTIME, &now);
+
+    gboolean callHandleSession = FALSE;
+
+    /* prepare to launch a circuit if its time to do so */
+    while(launch != NULL && (launch->abstime.tv_sec < now.tv_sec ||
+            (launch->abstime.tv_sec == now.tv_sec && launch->abstime.tv_nsec <= now.tv_nsec))) {
+        /* the circuit should have been launched in the past or now.
+         * use negative stream id to build circuit but skip the actual stream assignment */
+        g_queue_push_tail(launch->session->waitingStreamIDs, GINT_TO_POINTER(-1));
+        g_queue_push_tail(player->sessionAssignmentBacklog, launch->session);
+
+        callHandleSession = TRUE;
+
+        /* now update for the next circuit launch */
+        g_free(g_queue_pop_head(player->launches));
+        launch = g_queue_peek_head(player->launches);
+    }
+
+    if(callHandleSession) {
+        _oniontraceplayer_handleSessionBacklog(player);
+    }
+
+    if(launch) {
+        /* compute how much time we have from now until the next circuit should launch */
+        oniontracetimer_timespecsubtract(&nextLaunchTime, &now, &launch->abstime);
+    }
+
+    return nextLaunchTime;
+}
+
 gchar* oniontraceplayer_toString(OnionTracePlayer* player) {
     GString* string = g_string_new("");
     g_string_append_printf(string,
@@ -344,6 +405,7 @@ OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl, const gchar* fi
         return NULL;
     }
 
+    /* get the circuits we should create, sorted by launch times */
     GQueue* parsedCircuits = oniontracefile_parseCircuits(otfile, &now);
     oniontracefile_free(otfile);
 
@@ -355,8 +417,11 @@ OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl, const gchar* fi
     OnionTracePlayer* player = g_new0(OnionTracePlayer, 1);
     player->startTime = now;
     player->torctl = torctl;
+
     player->sessions = g_hash_table_new(g_str_hash, g_str_equal);
     player->circuits = g_hash_table_new(g_int_hash, g_int_equal);
+    player->launches = g_queue_new();
+
     player->sessionAssignmentBacklog = g_queue_new();
 
     GString* idbuf = g_string_new(NULL);
@@ -376,10 +441,11 @@ OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl, const gchar* fi
         if(sessionID && path) {
             oniontracecircuit_setCircuitStatus(circuit, CIRCUIT_STATUS_NONE);
 
-            PlayerSession* session = g_hash_table_lookup(player->sessions, sessionID);
+            /* store it in the appropriate session */
+            Session* session = g_hash_table_lookup(player->sessions, sessionID);
 
             if(!session) {
-                session = g_new0(PlayerSession, 1);
+                session = g_new0(Session, 1);
                 session->id = g_strdup(sessionID);
                 session->circuitsSorted = g_queue_new();
                 session->waitingStreamIDs = g_queue_new();
@@ -389,6 +455,16 @@ OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl, const gchar* fi
             g_queue_insert_sorted(session->circuitsSorted, circuit,
                     (GCompareDataFunc)oniontracecircuit_compareLaunchTime, NULL);
             numSessionCircuits++;
+
+            /* also store launch info so we can launch it before its needed */
+            LaunchInfo* launch = g_new0(LaunchInfo, 1);
+            launch->session = session;
+            launch->abstime = *oniontracecircuit_getLaunchTime(circuit);
+
+            /* we will try to build circuits preemptively */
+            launch->abstime.tv_sec -= 10; /* build 10 seconds early */
+
+            g_queue_push_tail(player->launches, launch);
         } else {
             /* there is no session id or path, so we do not need to track it */
             oniontracecircuit_free(circuit);
@@ -427,13 +503,17 @@ void oniontraceplayer_free(OnionTracePlayer* player) {
         g_queue_free(player->sessionAssignmentBacklog);
     }
 
+    if(player->launches) {
+        g_queue_free_full(player->launches, g_free);
+    }
+
     if(player->sessions) {
         GHashTableIter iter;
         gpointer key, value;
 
         g_hash_table_iter_init(&iter, player->sessions);
         while (g_hash_table_iter_next(&iter, &key, &value)) {
-            PlayerSession* session = value;
+            Session* session = value;
             if(session) {
                 if(session->circuitsSorted) {
                     while(!g_queue_is_empty(session->circuitsSorted)) {
@@ -452,6 +532,8 @@ void oniontraceplayer_free(OnionTracePlayer* player) {
                 if(session->id) {
                     g_free(session->id);
                 }
+
+                g_free(session);
             }
         }
 

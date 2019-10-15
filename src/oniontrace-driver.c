@@ -47,6 +47,43 @@ const gchar* _oniontracedriver_stateToString(OnionTraceDriverState state) {
     }
 }
 
+static void _oniontracedriver_playTimerReadable(OnionTraceTimer* timer, OnionTraceEventFlag type) {
+    g_assert(timer);
+    g_assert(type & ONIONTRACE_EVENT_READ);
+
+    /* if the timer triggered, this will call the timer callback function */
+    gboolean calledNotify = oniontracetimer_check(timer);
+    if(!calledNotify) {
+        warning("Authority unable to execute play timer callback function.");
+    }
+    /* free the timer since we don't track it anywhere else */
+    oniontracetimer_free(timer);
+}
+
+static void _oniontracedriver_playCallback(OnionTraceDriver* driver, gpointer unused) {
+    g_assert(driver);
+
+    /* compute the time until the next circuit should be created */
+    struct itimerspec armTime;
+    memset(&armTime, 0, sizeof(struct itimerspec));
+
+    /* build the circuit that we should be building now, and get next circuit time */
+    armTime.it_value = oniontraceplayer_launchNextCircuit(driver->player);
+
+    /* schedule another timer for the next circuit */
+    if(armTime.it_value.tv_sec > 0 || armTime.it_value.tv_nsec > 0) {
+        info("%s: launching next circuit in %"G_GSIZE_FORMAT".%09"G_GSIZE_FORMAT" seconds",
+                driver->id, (gsize)armTime.it_value.tv_sec, (gsize)armTime.it_value.tv_nsec);
+
+        OnionTraceTimer* timer = oniontracetimer_new((GFunc)_oniontracedriver_playCallback, driver, NULL);
+        oniontracetimer_armGranular(timer, &armTime);
+
+        gint timerFD = oniontracetimer_getFD(timer);
+        oniontraceeventmanager_register(driver->manager, timerFD, ONIONTRACE_EVENT_READ,
+                (OnionTraceOnEventFunc)_oniontracedriver_playTimerReadable, timer);
+    }
+}
+
 static void _oniontracedriver_genericTimerReadable(OnionTraceTimer* timer, OnionTraceEventFlag type) {
     g_assert(timer);
     g_assert(type & ONIONTRACE_EVENT_READ);
@@ -165,6 +202,9 @@ static void _oniontracedriver_onBootstrapped(OnionTraceDriver* driver) {
             oniontraceeventmanager_stopMainLoop(driver->manager);
             return;
         }
+
+        /* start building circuits according to the schedule */
+        _oniontracedriver_playCallback(driver, NULL);
     } else {
         driver->state = ONIONTRACE_DRIVER_LOGGING;
         const gchar* spaceDelimitedEvents = oniontraceconfig_getSpaceDelimitedEvents(driver->config);

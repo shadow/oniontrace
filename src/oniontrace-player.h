@@ -17,4 +17,6 @@ void oniontraceplayer_free(OnionTracePlayer* player);
 
 gchar* oniontraceplayer_toString(OnionTracePlayer* player);
 
+struct timespec oniontraceplayer_launchNextCircuit(OnionTracePlayer* player);
+
 #endif /* SRC_ONIONTRACE_PLAYER_H_ */
