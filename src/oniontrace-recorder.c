@@ -46,7 +46,7 @@ static void _oniontracerecorder_onStreamStatus(OnionTraceRecorder* recorder,
                     if(!sessionID) {
                         info("%s: storing username %s as the session name for circuit %i",
                                 recorder->id, username, circuitID);
-                        oniontracecircuit_setSessionID(circuit, g_strdup(username));
+                        oniontracecircuit_setSessionID(circuit, username);
                     } else {
                         if(g_ascii_strcasecmp(sessionID, username)) {
                             /* this means they do NOT match */
@@ -110,7 +110,7 @@ static void _oniontracerecorder_onCircuitStatus(OnionTraceRecorder* recorder,
                 if(status == CIRCUIT_STATUS_EXTENDED && path != NULL) {
                     /* if we got a second path... this will keep the latest one */
                     info("%s: storing path %s for EXTENDED circuit %i", recorder->id, path, circuitID);
-                    oniontracecircuit_setPath(circuit, g_strdup(path));
+                    oniontracecircuit_setPath(circuit, path);
                 }
 
                 g_hash_table_replace(recorder->circuits, oniontracecircuit_getID(circuit), circuit);
@@ -130,7 +130,7 @@ static void _oniontracerecorder_onCircuitStatus(OnionTraceRecorder* recorder,
                 if(circuit && path) {
                     /* if we got a second path... this will keep the latest one */
                     info("%s: storing path %s for BUILT circuit %i", recorder->id, path, circuitID);
-                    oniontracecircuit_setPath(circuit, g_strdup(path));
+                    oniontracecircuit_setPath(circuit, path);
                 }
             }
             break;

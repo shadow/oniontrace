@@ -24,13 +24,13 @@ struct timespec* oniontracecircuit_getLaunchTime(OnionTraceCircuit* circuit);
 void oniontracecircuit_setCircuitID(OnionTraceCircuit* circuit, gint circuitID);
 gint oniontracecircuit_getCircuitID(OnionTraceCircuit* circuit);
 
-void oniontracecircuit_setSessionID(OnionTraceCircuit* circuit, gchar* sessionID);
+void oniontracecircuit_setSessionID(OnionTraceCircuit* circuit, const gchar* sessionID);
 const gchar* oniontracecircuit_getSessionID(OnionTraceCircuit* circuit);
 
 void oniontracecircuit_setCircuitStatus(OnionTraceCircuit* circuit, CircuitStatus status);
 CircuitStatus oniontracecircuit_getCircuitStatus(OnionTraceCircuit* circuit);
 
-void oniontracecircuit_setPath(OnionTraceCircuit* circuit, gchar* path);
+void oniontracecircuit_setPath(OnionTraceCircuit* circuit, const gchar* path);
 const gchar* oniontracecircuit_getPath(OnionTraceCircuit* circuit);
 
 void oniontracecircuit_incrementStreamCounter(OnionTraceCircuit* circuit);

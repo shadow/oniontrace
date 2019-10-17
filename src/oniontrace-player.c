@@ -43,6 +43,36 @@ struct _OnionTracePlayer {
     } counts;
 };
 
+static Session* _oniontraceplayer_newSession(const gchar* sessionID) {
+    Session* session = g_new0(Session, 1);
+    session->id = g_strdup(sessionID);
+    session->circuitsSorted = g_queue_new();
+    session->waitingStreamIDs = g_queue_new();
+    return session;
+}
+
+static void _oniontraceplayer_freeSession(Session* session) {
+    if(session->circuitsSorted) {
+        while(!g_queue_is_empty(session->circuitsSorted)) {
+            OnionTraceCircuit* circuit = g_queue_pop_head(session->circuitsSorted);
+            if(circuit) {
+                oniontracecircuit_free(circuit);
+            }
+        }
+        g_queue_free(session->circuitsSorted);
+    }
+
+    if(session->waitingStreamIDs) {
+        g_queue_free(session->waitingStreamIDs);
+    }
+
+    if(session->id) {
+        g_free(session->id);
+    }
+
+    g_free(session);
+}
+
 static OnionTraceCircuit* _oniontraceplayer_getCurrentCircuit(OnionTracePlayer* player, Session* session) {
     g_assert(player);
     g_assert(session);
@@ -112,7 +142,7 @@ static void _oniontraceplayer_handleSession(OnionTracePlayer* player, Session* s
                 oniontracetorctl_commandBuildNewCircuit(player->torctl, path);
 
                 message("%s: launched new circuit on session %s with path %s",
-                        player->id, session->id, path);
+                        player->id, session->id, path ? path : "NULL");
             }
             player->counts.circuitsBuilding++;
             player->sessionAwaitingAssignment = session;
@@ -192,15 +222,33 @@ static void _oniontraceplayer_onStreamStatus(OnionTracePlayer* player,
                 break;
             }
 
-            /* if we have never parsed this session id, let Tor do assignment */
-            if(!session || g_queue_is_empty(session->circuitsSorted)) {
-                warning("%s: session %s is missing; "
-                        "asking Tor to choose how to attach stream %i to a circuit",
-                        player->id, username, streamID);
+            /* this could happen if the session never completed during the record phase, so
+             * it never got recorded. */
+            if(!session) {
+                warning("%s: no session exists for %s; creating new session now",
+                        player->id, username);
 
-                oniontracetorctl_commandAttachStreamToCircuit(player->torctl, streamID, 0);
+                session = _oniontraceplayer_newSession(username);
+                g_hash_table_replace(player->sessions, session->id, session);
+            }
 
-                break;
+            /* this could happen if an existing session ran out of circuits, or if we created a
+             * new session from an id that we never seen before and so it has no circuits either */
+            if(g_queue_is_empty(session->circuitsSorted)) {
+                warning("%s: no circuit exists for session %s; creating new circuit now with NULL path",
+                                        player->id, session->id);
+
+                struct timespec now;
+                memset(&now, 0, sizeof(struct timespec));
+                clock_gettime(CLOCK_REALTIME, &now);
+
+                OnionTraceCircuit* circuit = oniontracecircuit_new();
+                oniontracecircuit_setSessionID(circuit, session->id);
+                oniontracecircuit_setCircuitStatus(circuit, CIRCUIT_STATUS_NONE);
+                oniontracecircuit_setLaunchTime(circuit, &now);
+
+                g_queue_insert_sorted(session->circuitsSorted, circuit,
+                        (GCompareDataFunc)oniontracecircuit_compareLaunchTime, NULL);
             }
 
             g_queue_push_tail(session->waitingStreamIDs, GINT_TO_POINTER(streamID));
@@ -316,7 +364,7 @@ static void _oniontraceplayer_onCircuitStatus(OnionTracePlayer* player,
                     if(!g_queue_is_empty(session->waitingStreamIDs)) {
                         const gchar* circuitPath = oniontracecircuit_getPath(circuit);
                         info("%s: retrying circuit on session %s with path %s",
-                                player->id, sessionID, circuitPath);
+                                player->id, sessionID, circuitPath ? circuitPath : "NULL");
 
                         g_queue_push_tail(player->sessionAssignmentBacklog, session);
                         _oniontraceplayer_handleSessionBacklog(player);
@@ -453,10 +501,7 @@ OnionTracePlayer* oniontraceplayer_new(OnionTraceTorCtl* torctl, const gchar* fi
             Session* session = g_hash_table_lookup(player->sessions, sessionID);
 
             if(!session) {
-                session = g_new0(Session, 1);
-                session->id = g_strdup(sessionID);
-                session->circuitsSorted = g_queue_new();
-                session->waitingStreamIDs = g_queue_new();
+                session = _oniontraceplayer_newSession(sessionID);
                 g_hash_table_replace(player->sessions, session->id, session);
             }
 
@@ -523,25 +568,7 @@ void oniontraceplayer_free(OnionTracePlayer* player) {
         while (g_hash_table_iter_next(&iter, &key, &value)) {
             Session* session = value;
             if(session) {
-                if(session->circuitsSorted) {
-                    while(!g_queue_is_empty(session->circuitsSorted)) {
-                        OnionTraceCircuit* circuit = g_queue_pop_head(session->circuitsSorted);
-                        if(circuit) {
-                            oniontracecircuit_free(circuit);
-                        }
-                    }
-                    g_queue_free(session->circuitsSorted);
-                }
-
-                if(session->waitingStreamIDs) {
-                    g_queue_free(session->waitingStreamIDs);
-                }
-
-                if(session->id) {
-                    g_free(session->id);
-                }
-
-                g_free(session);
+                _oniontraceplayer_freeSession(session);
             }
         }
 

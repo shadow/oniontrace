@@ -60,13 +60,13 @@ OnionTraceCircuit* oniontracecircuit_fromCSV(const gchar* line, struct timespec*
             /* the session id is a string */
             if(g_ascii_strcasecmp(parts[1], "NULL")) {
                /* its not equal to NULL, so it must be valid */
-                oniontracecircuit_setSessionID(circuit, g_strdup(parts[1]));
+                oniontracecircuit_setSessionID(circuit, parts[1]);
             }
 
             /* the path is a string */
             if(g_ascii_strcasecmp(parts[2], "NULL")) {
                /* its not equal to NULL, so it must be valid */
-                oniontracecircuit_setPath(circuit, g_strdup(parts[2]));
+                oniontracecircuit_setPath(circuit, parts[2]);
             }
         }
 
@@ -141,12 +141,12 @@ CircuitStatus oniontracecircuit_getCircuitStatus(OnionTraceCircuit* circuit) {
     return circuit->status;
 }
 
-void oniontracecircuit_setSessionID(OnionTraceCircuit* circuit, gchar* sessionID) {
+void oniontracecircuit_setSessionID(OnionTraceCircuit* circuit, const gchar* sessionID) {
     g_assert(circuit);
     if(circuit->sessionID) {
         g_free(circuit->sessionID);
     }
-    circuit->sessionID = sessionID;
+    circuit->sessionID = g_strdup(sessionID);
 }
 
 const gchar* oniontracecircuit_getSessionID(OnionTraceCircuit* circuit) {
@@ -154,12 +154,12 @@ const gchar* oniontracecircuit_getSessionID(OnionTraceCircuit* circuit) {
     return circuit->sessionID;
 }
 
-void oniontracecircuit_setPath(OnionTraceCircuit* circuit, gchar* path) {
+void oniontracecircuit_setPath(OnionTraceCircuit* circuit, const gchar* path) {
     g_assert(circuit);
     if(circuit->path) {
         g_free(circuit->path);
     }
-    circuit->path = path;
+    circuit->path = g_strdup(path);
 }
 
 const gchar* oniontracecircuit_getPath(OnionTraceCircuit* circuit) {
