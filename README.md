@@ -1,17 +1,30 @@
 ## OnionTrace
 
+![](https://github.com/shadow/oniontrace/workflows/Builds/badge.svg)
+
 This program records and plays back Tor circuit building and stream assignment.
 It can also register for several asynchronous Tor events and logs the events
 as they are received from Tor over time.
 
 ## Setup
 
-```
-mkdir build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=/home/user/.local
-make
-make install # optional, installs to path set above
-```
+Dependencies in Fedora/RedHat:
+
+    sudo yum install cmake glib2 glib2-devel
+
+Dependencies in Ubuntu/Debian:
+
+    sudo apt-get install cmake libglib2.0-0 libglib2.0-dev
+
+Build with a custom install prefix:
+
+    mkdir build && cd build
+    cmake .. -DCMAKE_INSTALL_PREFIX=/home/$USER/.local
+    make
+
+Optionally install to the prefix:
+
+    make install
 
 ## Usage
 

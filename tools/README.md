@@ -12,7 +12,7 @@ Dependencies in Fedora/RedHat:
 
 Dependencies in Ubuntu/Debian:
 
-    sudo apt-get install python python-dev python-pip python-virtualenv libxml2 libxml2-dev libxslt1.1 libxslt1-dev libpng12-0 libpng12-dev libfreetype6 libfreetype6-dev libblas-dev liblapack-dev
+    sudo apt-get install python python-dev python-pip python-virtualenv libxml2 libxml2-dev libxslt1.1 libxslt1-dev libpng16-16 libpng16-16 libfreetype6 libfreetype6-dev libblas-dev liblapack-dev
 
 ## Install OnionTraceTools Python modules
 
