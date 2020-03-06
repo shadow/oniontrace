@@ -60,4 +60,63 @@ The following are **optional** arguments (default values exist):
    of events, e.g., 'BW,CIRC,STREAM'. See Section 4.1 of the  
    'Tor control protocol' specification for a full list of acceptable events.  
    (https://gitweb.torproject.org/torspec.git/tree/control-spec.txt)
-   
+
+## Tor Changes Required for record Mode
+
+In order for the `record` mode to work correctly, we need Tor to export the
+socks username in all stream control events. That will allow us to keep the
+the same streams on the correct circuits when using `playback` mode to play
+back a recorded trace file.
+
+If the original stream control event is this:
+
+```
+650 STREAM 21 NEW 0 11.0.0.6:18080 SOURCE_ADDR=127.0.0.1:21437
+```
+
+We need to change Tor so that it outputs events like:
+
+```
+650 STREAM 21 NEW 0 11.0.0.6:18080 SOURCE_ADDR=127.0.0.1:21437 USERNAME=MYUSER
+```
+
+Where `MYUSER` is the SOCKS username in use to tie that stream to a circuit.
+Here is a patch that was created to do this for `tor-0.3.5.8`, which may help
+you understand how to change a newer version of Tor to export the correct info.
+
+```
+diff --git a/src/feature/control/control.c b/src/feature/control/control.c
+index cc7ecff2f..fac51eb38 100644
+--- a/src/feature/control/control.c
++++ b/src/feature/control/control.c
+@@ -5904,16 +5904,28 @@ control_event_stream_status(entry_connection_t *conn, stream_status_event_t tp,
+       purpose = " PURPOSE=USER";
+   }
+ 
++  /* send socks username along with stream events. */
++  char user[64];
++  int do_user = (conn->socks_request && conn->socks_request->username) ? 1 : 0;
++
++  if(do_user) {
++    char* u_null_term = tor_memdup_nulterm(conn->socks_request->username,
++        conn->socks_request->usernamelen);
++    tor_snprintf(user, 64, " USERNAME=%s", u_null_term);
++    free(u_null_term);
++  }
++
+   circ = circuit_get_by_edge_conn(ENTRY_TO_EDGE_CONN(conn));
+   if (circ && CIRCUIT_IS_ORIGIN(circ))
+     origin_circ = TO_ORIGIN_CIRCUIT(circ);
+   send_control_event(EVENT_STREAM_STATUS,
+-                        "650 STREAM %"PRIu64" %s %lu %s%s%s%s\r\n",
++                        "650 STREAM %"PRIu64" %s %lu %s%s%s%s%s\r\n",
+                      (ENTRY_TO_CONN(conn)->global_identifier),
+                      status,
+                         origin_circ?
+                            (unsigned long)origin_circ->global_identifier : 0ul,
+-                        buf, reason_buf, addrport_buf, purpose);
++                        buf, reason_buf, addrport_buf, purpose,
++                        do_user ? user : "");
+ 
+   /* XXX need to specify its intended exit, etc? */
+```
