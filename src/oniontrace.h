@@ -35,7 +35,7 @@
 #include "oniontrace-recorder.h"
 #include "oniontrace-driver.h"
 
-#define ONIONTRACE_VERSION "0.0.1"
+#define ONIONTRACE_VERSION "1.0.0"
 
 /* logging facility */
 void oniontrace_log(GLogLevelFlags level, const gchar* functionName, const gchar* format, ...);
