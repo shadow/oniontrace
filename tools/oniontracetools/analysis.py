@@ -52,6 +52,18 @@ class Analysis(object):
         except:
             return None
 
+    def get_data_circuit(self, node):
+        try:
+            return self.json_db['data'][node]['oniontrace']['circuit']
+        except:
+            return None
+
+    def get_data_circuit_summary(self, node):
+        try:
+            return self.json_db['data'][node]['oniontrace']['circuit_summary']
+        except:
+            return None
+
     def analyze(self, do_complete=False, date_filter=None):
         if self.did_analysis:
             return
@@ -226,6 +238,8 @@ class OnionTraceParser(Parser):
         self.bootstrapping = {}
         self.bandwidth = {'bytes_read': {}, 'bytes_written': {}}
         self.bandwidth_summary = {'bytes_read_total': 0, 'bytes_written_total': 0}
+        self.circuit = {'build_time': {}, 'fail_time': {}}
+        self.circuit_summary = {'circuits_built_total': 0, 'circuits_failed_total': 0}
         self.name = None
         self.date_filter = date_filter
         self.version_mismatch = False
@@ -315,6 +329,40 @@ class OnionTraceParser(Parser):
             self.bandwidth_summary['bytes_read_total'] += bwr
             self.bandwidth_summary['bytes_written_total'] += bww
 
+        elif self.boot_succeeded and re.search("Logger:\s650\sCIRC\s", line) is not None:
+            is_built = True if re.search("\sBUILT\s", line) is not None else False
+            is_failed = True if ((not is_built) and (re.search("\sFAILED\s", line) is not None)) else False
+
+            if is_built or is_failed:
+                parts = line.strip().split()
+
+                if len(parts) < 10:
+                    return True
+
+                unix_ts = float(parts[2])
+                now_dt = datetime.datetime.utcfromtimestamp(unix_ts)
+                second = int(unix_ts)
+
+                create_dt = None
+                parts.reverse()
+                for part in parts:
+                    if "TIME_CREATED" in part:
+                        time_str = part.split('=')[1]
+                        create_dt = datetime.datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%f")
+                        break
+
+                if create_dt is not None:
+                    cbt = (now_dt - create_dt).total_seconds()
+
+                    if is_built:
+                        self.circuit['build_time'].setdefault(second, [])
+                        self.circuit['build_time'][second].append(cbt)
+                        self.circuit_summary['circuits_built_total'] += 1
+                    else:
+                        self.circuit['fail_time'].setdefault(second, [])
+                        self.circuit['fail_time'][second].append(cbt)
+                        self.circuit_summary['circuits_failed_total'] += 1
+
         return True
 
     def parse(self, source, do_complete=False):
@@ -357,12 +405,37 @@ class OnionTraceParser(Parser):
             self.bandwidth_summary['bytes_read_std'] = int(std(bytes_read))
             self.bandwidth_summary['bytes_written_std'] = int(std(bytes_written))
 
+        if self.boot_succeeded and len(self.circuit['build_time']) > 0:
+            cbts = []
+            for second in self.circuit['build_time']:
+                cbts.extend(self.circuit['build_time'][second])
+
+            self.circuit_summary['build_time_min'] = float(min(cbts))
+            self.circuit_summary['build_time_max'] = float(max(cbts))
+            self.circuit_summary['build_time_median'] = float(median(cbts))
+            self.circuit_summary['build_time_mean'] = float(mean(cbts))
+            self.circuit_summary['build_time_std'] = float(std(cbts))
+
+        if self.boot_succeeded and len(self.circuit['fail_time']) > 0:
+            cbts = []
+            for second in self.circuit['fail_time']:
+                cbts.extend(self.circuit['fail_time'][second])
+
+            self.circuit_summary['fail_time_min'] = float(min(cbts))
+            self.circuit_summary['fail_time_max'] = float(max(cbts))
+            self.circuit_summary['fail_time_median'] = float(median(cbts))
+            self.circuit_summary['fail_time_mean'] = float(mean(cbts))
+            self.circuit_summary['fail_time_std'] = float(std(cbts))
+
     def get_data(self):
         have_bw = True if len(self.bandwidth['bytes_read']) > 0 and len(self.bandwidth['bytes_written']) > 0 else False
+        have_cbt = True if len(self.circuit['build_time']) > 0 else False
         return {
             'bootstrapping': self.bootstrapping if len(self.bootstrapping) > 0 else None,
             'bandwidth': self.bandwidth if have_bw else None,
             'bandwidth_summary': self.bandwidth_summary if have_bw else None,
+            'circuit': self.circuit if have_cbt else None,
+            'circuit_summary': self.circuit_summary if have_cbt else None,
         }
 
     def get_name(self):
