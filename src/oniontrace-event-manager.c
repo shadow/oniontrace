@@ -128,7 +128,7 @@ static void _oniontraceventmanager_processEvent(OnionTraceEventManager* manager,
     debug("started processing event %s for descriptor %i",
             (event == ONIONTRACE_EVENT_READ) ? "READ" :
             (event == ONIONTRACE_EVENT_WRITE) ? "WRITE" :
-            (event == ONIONTRACE_EVENT_READ|ONIONTRACE_EVENT_WRITE) ? "READ|WRITE" :
+            (event == (ONIONTRACE_EVENT_READ|ONIONTRACE_EVENT_WRITE)) ? "READ|WRITE" :
             "NONE", descriptor);
 
     OnionTraceWatch* watch = g_hash_table_lookup(manager->watches, &descriptor);
@@ -137,7 +137,7 @@ static void _oniontraceventmanager_processEvent(OnionTraceEventManager* manager,
         warning("missing watch object to handle event %s for descriptor %i",
                     (event == ONIONTRACE_EVENT_READ) ? "READ" :
                     (event == ONIONTRACE_EVENT_WRITE) ? "WRITE" :
-                    (event == ONIONTRACE_EVENT_READ|ONIONTRACE_EVENT_WRITE) ? "READ|WRITE" :
+                    (event == (ONIONTRACE_EVENT_READ|ONIONTRACE_EVENT_WRITE)) ? "READ|WRITE" :
                     "NONE", descriptor);
         return;
     }
@@ -151,7 +151,7 @@ static void _oniontraceventmanager_processEvent(OnionTraceEventManager* manager,
     debug("finished processing event %s for descriptor %i",
                 (event == ONIONTRACE_EVENT_READ) ? "READ" :
                 (event == ONIONTRACE_EVENT_WRITE) ? "WRITE" :
-                (event == ONIONTRACE_EVENT_READ|ONIONTRACE_EVENT_WRITE) ? "READ|WRITE" :
+                (event == (ONIONTRACE_EVENT_READ|ONIONTRACE_EVENT_WRITE)) ? "READ|WRITE" :
                 "NONE", descriptor);
 }
 
