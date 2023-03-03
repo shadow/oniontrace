@@ -239,7 +239,9 @@ class OnionTraceParser(Parser):
         self.bandwidth = {'bytes_read': {}, 'bytes_written': {}}
         self.bandwidth_summary = {'bytes_read_total': 0, 'bytes_written_total': 0}
         self.circuit = {'build_time': {}, 'fail_time': {}}
-        self.circuit_summary = {'circuits_built_total': 0, 'circuits_failed_total': 0}
+        self.circuit_summary = {
+            'circuits_built_total': 0, 'circuits_failed_total': 0,
+            'cannibalized_circuits_built_total': 0, 'cannibalized_circuits_failed_total': 0}
         self.name = None
         self.date_filter = date_filter
         self.version_mismatch = False
@@ -334,15 +336,14 @@ class OnionTraceParser(Parser):
             is_built = True if re.search("\sBUILT\s", line) is not None else False
             is_failed = True if ((not is_built) and (re.search("\sFAILED\s", line) is not None)) else False
 
-            match = re.search("\sCIRC\s([^\s]+)\s", line)
-            circ_id = match.group(1)
-
             # Process built and failed events.
-            # We ignore circuits we've already seen built or failed, to avoid
-            # interpreting a repurposed circuit as having a very long built or
-            # failed time.
-            # https://gitlab.torproject.org/tpo/core/tor/-/issues/40570
-            if circ_id not in self.circuit_ids_built and (is_built or is_failed):
+            if is_built or is_failed:
+                match = re.search("\sCIRC\s([^\s]+)\s", line)
+                circ_id = match.group(1)
+                # We assume that events for a circuit we've already seen built are
+                # due to it being cannibalized for a hidden service circuit.
+                # https://gitlab.torproject.org/tpo/core/tor/-/issues/40570
+                is_cannibalized = circ_id in self.circuit_ids_built
                 self.circuit_ids_built.add(circ_id)
 
                 parts = line.strip().split()
@@ -362,17 +363,26 @@ class OnionTraceParser(Parser):
                         create_dt = datetime.datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%f")
                         break
 
-                if create_dt is not None:
-                    cbt = (now_dt - create_dt).total_seconds()
-
+                if is_cannibalized:
+                    # We can't calculate accurate build or fail times
+                    # for cannibalized circuits, so we just record the counts.
+                    # https://gitlab.torproject.org/tpo/core/tor/-/issues/40570
                     if is_built:
-                        self.circuit['build_time'].setdefault(second, [])
-                        self.circuit['build_time'][second].append(cbt)
-                        self.circuit_summary['circuits_built_total'] += 1
+                        self.circuit_summary['cannibalized_circuits_built_total'] += 1
                     else:
-                        self.circuit['fail_time'].setdefault(second, [])
-                        self.circuit['fail_time'][second].append(cbt)
-                        self.circuit_summary['circuits_failed_total'] += 1
+                        self.circuit_summary['cannibalized_circuits_failed_total'] += 1
+                else:
+                    if create_dt is not None:
+                        cbt = (now_dt - create_dt).total_seconds()
+
+                        if is_built:
+                            self.circuit['build_time'].setdefault(second, [])
+                            self.circuit['build_time'][second].append(cbt)
+                            self.circuit_summary['circuits_built_total'] += 1
+                        else:
+                            self.circuit['fail_time'].setdefault(second, [])
+                            self.circuit['fail_time'][second].append(cbt)
+                            self.circuit_summary['circuits_failed_total'] += 1
 
         return True
 
