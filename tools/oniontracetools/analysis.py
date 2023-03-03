@@ -245,6 +245,7 @@ class OnionTraceParser(Parser):
         self.version_mismatch = False
         self.boot_succeeded = False
         self.start_ts = None
+        self.circuit_ids_built = set()
 
     def __is_date_valid(self, date_to_check):
         if self.date_filter is None:
@@ -333,7 +334,17 @@ class OnionTraceParser(Parser):
             is_built = True if re.search("\sBUILT\s", line) is not None else False
             is_failed = True if ((not is_built) and (re.search("\sFAILED\s", line) is not None)) else False
 
-            if is_built or is_failed:
+            match = re.search("\sCIRC\s([^\s]+)\s", line)
+            circ_id = match.group(1)
+
+            # Process built and failed events.
+            # We ignore circuits we've already seen built or failed, to avoid
+            # interpreting a repurposed circuit as having a very long built or
+            # failed time.
+            # https://gitlab.torproject.org/tpo/core/tor/-/issues/40570
+            if circ_id not in self.circuit_ids_built and (is_built or is_failed):
+                self.circuit_ids_built.add(circ_id)
+
                 parts = line.strip().split()
 
                 if len(parts) < 10:
