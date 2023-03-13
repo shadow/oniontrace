@@ -240,8 +240,8 @@ class OnionTraceParser(Parser):
         self.bandwidth_summary = {'bytes_read_total': 0, 'bytes_written_total': 0}
         self.circuit = {'build_time': {}, 'fail_time': {}}
         self.circuit_summary = {
-            'circuits_built_total': 0, 'circuits_failed_total': 0,
-            'cannibalized_circuits_built_total': 0, 'cannibalized_circuits_failed_total': 0}
+            'circuits_built_total': 0, 'circuits_failed_total': {},
+            'cannibalized_circuits_built_total': 0, 'cannibalized_circuits_failed_total': {}}
         self.name = None
         self.date_filter = date_filter
         self.version_mismatch = False
@@ -363,6 +363,12 @@ class OnionTraceParser(Parser):
                         create_dt = datetime.datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S.%f")
                         break
 
+                if is_failed:
+                    match = re.search("\sREASON=([^\s]+)", line)
+                    failure_reason = match.group(1)
+                else:
+                    failure_reason = None
+
                 if is_cannibalized:
                     # We can't calculate accurate build or fail times
                     # for cannibalized circuits, so we just record the counts.
@@ -370,7 +376,8 @@ class OnionTraceParser(Parser):
                     if is_built:
                         self.circuit_summary['cannibalized_circuits_built_total'] += 1
                     else:
-                        self.circuit_summary['cannibalized_circuits_failed_total'] += 1
+                        self.circuit_summary['cannibalized_circuits_failed_total'].setdefault(failure_reason, 0)
+                        self.circuit_summary['cannibalized_circuits_failed_total'][failure_reason] += 1
                 else:
                     if create_dt is not None:
                         cbt = (now_dt - create_dt).total_seconds()
@@ -382,7 +389,8 @@ class OnionTraceParser(Parser):
                         else:
                             self.circuit['fail_time'].setdefault(second, [])
                             self.circuit['fail_time'][second].append(cbt)
-                            self.circuit_summary['circuits_failed_total'] += 1
+                            self.circuit_summary['circuits_failed_total'].setdefault(failure_reason, 0)
+                            self.circuit_summary['circuits_failed_total'][failure_reason] += 1
 
         return True
 
