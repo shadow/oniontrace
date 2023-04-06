@@ -126,7 +126,7 @@ to use the number of available processor cores""",
     analyze_parser.add_argument('-e', '--expression',
         help="""Append a regex PATTERN to a custom list of strings used with
 re.search to find log file names in the search path. The custom list of patterns
-will override the default pattern 'oniontrace.*\.log'.""",
+will override the default pattern 'oniontrace[^/]*\.log$'.""",
         metavar="PATTERN", type=str,
         action="append", dest="patterns",
         default=[])
@@ -175,7 +175,7 @@ By default, results from all hosts in the analysis file will get plotted.""",
 def analyze(args):
     from oniontracetools.analysis import ParallelAnalysis, SerialAnalysis
 
-    searchexp = args.patterns if len(args.patterns) > 0 else ["oniontrace.*\.log"]
+    searchexp = args.patterns if len(args.patterns) > 0 else ["oniontrace[^/]*\.log$"]
 
     paths = []
     if os.path.isdir(args.log_file_path):
